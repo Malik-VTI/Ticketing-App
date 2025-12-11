@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: train-service
+  
+  datasource:
+    url: jdbc:sqlserver://${DB_SERVER:10.100.33.68}:${DB_PORT:1433};databaseName=${DB_DATABASE:ticketing_app};encrypt=false;trustServerCertificate=true
+    username: ${DB_USER:lek}
+    password: ${DB_PASSWORD:P@ssw0rd}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLServerDialect
+        format_sql: true
+
+server:
+  port: ${TRAIN_SERVICE_PORT:8084}
+
+logging:
+  level:
+    com.train_service: INFO
+    org.springframework.web: INFO

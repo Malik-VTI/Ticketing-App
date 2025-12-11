@@ -1,0 +1,40 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+bin/
+dist/
+build/
+
+# Go specific (if any Go binaries at root)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Node modules (if any at root)
+node_modules/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+

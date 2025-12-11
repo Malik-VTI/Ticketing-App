@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: pricing-service
+
+server:
+  port: 8086
+
+services:
+  flight:
+    url: ${FLIGHT_SERVICE_URL:http://localhost:8083}
+  train:
+    url: ${TRAIN_SERVICE_URL:http://localhost:8084}
+  hotel:
+    url: ${HOTEL_SERVICE_URL:http://localhost:8085}
