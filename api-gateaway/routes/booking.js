@@ -25,25 +25,8 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/bookings/:id
- * Get booking by ID
- */
-router.get('/:id', authenticate, async (req, res) => {
-  try {
-    const data = await proxyRequest(bookingClient, 'GET', `/bookings/${req.params.id}`, {
-      authHeader: req.headers.authorization,
-      userId: req.user.id,
-      userEmail: req.user.email,
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(error.status || 500).json(error.data || { error: error.message });
-  }
-});
-
-/**
  * GET /api/bookings/reference/:reference
- * Get booking by reference
+ * Get booking by reference (must be BEFORE /:id)
  */
 router.get('/reference/:reference', authenticate, async (req, res) => {
   try {
@@ -60,7 +43,7 @@ router.get('/reference/:reference', authenticate, async (req, res) => {
 
 /**
  * GET /api/bookings/user/:userId
- * Get user bookings
+ * Get user bookings (must be BEFORE /:id)
  */
 router.get('/user/:userId', authenticate, async (req, res) => {
   try {
@@ -70,6 +53,23 @@ router.get('/user/:userId', authenticate, async (req, res) => {
     };
     const data = await proxyRequest(bookingClient, 'GET', `/bookings/user/${req.params.userId}`, {
       params,
+      authHeader: req.headers.authorization,
+      userId: req.user.id,
+      userEmail: req.user.email,
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 500).json(error.data || { error: error.message });
+  }
+});
+
+/**
+ * GET /api/bookings/:id
+ * Get booking by ID (must be AFTER specific routes)
+ */
+router.get('/:id', authenticate, async (req, res) => {
+  try {
+    const data = await proxyRequest(bookingClient, 'GET', `/bookings/${req.params.id}`, {
       authHeader: req.headers.authorization,
       userId: req.user.id,
       userEmail: req.user.email,

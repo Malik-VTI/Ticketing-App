@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"booking-service/cache"
 	"booking-service/config"
 	"booking-service/database"
 	"booking-service/repository"
@@ -44,6 +45,10 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.CloseDB()
+
+	// Initialize Redis (optional — degrades gracefully if unavailable)
+	cache.InitRedis()
+	defer cache.CloseRedis()
 
 	// Initialize repositories
 	bookingRepo := repository.NewBookingRepository()

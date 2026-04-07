@@ -28,5 +28,8 @@ public interface CoachSeatRepository extends JpaRepository<CoachSeat, UUID> {
                                                           @Param("seatClass") String seatClass);
     
     Optional<CoachSeat> findByCoachIdAndSeatNumber(UUID coachId, String seatNumber);
+    
+    @Query("SELECT cs FROM CoachSeat cs WHERE cs.coach.trainSchedule.id = :scheduleId AND cs.seatNumber IN :seatNumbers")
+    List<CoachSeat> findByScheduleIdAndSeatNumberIn(@Param("scheduleId") UUID scheduleId, @Param("seatNumbers") List<String> seatNumbers);
 }
 

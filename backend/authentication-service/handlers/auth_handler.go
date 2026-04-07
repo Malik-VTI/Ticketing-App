@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"log"
 	"time"
 
 	"authentication-service/config"
@@ -68,14 +69,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	if err := h.userRepo.Create(user); err != nil {
-		// Check for duplicate email error
-		if err.Error() == "mssql: Violation of UNIQUE KEY constraint" {
-			c.JSON(http.StatusConflict, models.ErrorResponse{
-				Error:   "user_exists",
-				Message: "User with this email already exists",
-			})
-			return
-		}
+		// Log underlying error so we can debug DB issues (e.g. constraint violations)
+		log.Printf("register: failed to create user email=%s: %v", req.Email, err)
 
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",

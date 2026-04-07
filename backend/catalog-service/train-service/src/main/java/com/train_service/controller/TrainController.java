@@ -2,13 +2,17 @@ package com.train_service.controller;
 
 import com.train_service.dto.CoachSeatDTO;
 import com.train_service.dto.TrainScheduleDTO;
+import com.train_service.dto.request.ReserveSeatsRequest;
+import com.train_service.exception.ResourceNotFoundException;
 import com.train_service.service.TrainService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -61,6 +65,18 @@ public class TrainController {
     public ResponseEntity<List<CoachSeatDTO>> getAvailableSeatsBySchedule(@PathVariable UUID id) {
         List<CoachSeatDTO> seats = trainService.getAvailableSeatsBySchedule(id);
         return ResponseEntity.ok(seats);
+    }
+
+    @PostMapping("/schedules/{id}/reserve")
+    public ResponseEntity<?> reserveSeats(@PathVariable UUID id, @Valid @RequestBody ReserveSeatsRequest request) {
+        try {
+            trainService.reserveSeats(id, request.getSeatNumbers());
+            return ResponseEntity.ok().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 
     @GetMapping("/health")

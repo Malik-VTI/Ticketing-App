@@ -42,7 +42,7 @@ public class FlightService {
     }
 
     public Page<FlightScheduleDTO> getAllSchedules(Pageable pageable) {
-        Page<FlightSchedule> schedules = scheduleRepository.findAll(pageable);
+        Page<FlightSchedule> schedules = scheduleRepository.findAllWithDetails(pageable); // changed
         return schedules.map(this::convertToDTO);
     }
 
@@ -58,6 +58,31 @@ public class FlightService {
         return seats.stream()
                 .map(this::convertSeatToDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void reserveSeats(UUID scheduleId, List<String> seatNumbers) {
+        List<FlightSeat> seats = seatRepository.findByFlightScheduleIdAndSeatNumberIn(scheduleId, seatNumbers);
+        
+        if (seats.size() != seatNumbers.size()) {
+            throw new ResourceNotFoundException("Some seats in " + seatNumbers + " not found for schedule " + scheduleId);
+        }
+
+        for (FlightSeat seat : seats) {
+            if (!"available".equals(seat.getStatus())) {
+                throw new IllegalStateException("Seat " + seat.getSeatNumber() + " is already " + seat.getStatus());
+            }
+            seat.setStatus("booked");
+        }
+        
+        seatRepository.saveAll(seats);
+    }
+
+    public List<FlightScheduleDTO> searchByAirportNames(
+            String originName, String destinationName, LocalDate date) {
+        List<FlightSchedule> schedules = scheduleRepository
+                .findByAirportNamesAndDate(originName, destinationName, date);
+        return schedules.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
     private FlightScheduleDTO convertToDTO(FlightSchedule schedule) {

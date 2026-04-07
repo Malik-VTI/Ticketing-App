@@ -1,0 +1,48 @@
+.skeleton {
+  background-color: #e5e7eb;
+  background-image: linear-gradient(
+    90deg,
+    #e5e7eb 0px,
+    #f3f4f6 40px,
+    #e5e7eb 80px
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: shimmer 1.5s infinite linear;
+  display: inline-block;
+  opacity: 0.7;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  width: 100%;
+  height: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-title {
+  width: 60%;
+  height: 2rem;
+  margin-bottom: 1rem;
+}
+
+.skeleton-card {
+  width: 100%;
+  height: 150px;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}

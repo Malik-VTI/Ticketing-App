@@ -4,15 +4,15 @@
 
 -- Create audit_logs table
 CREATE TABLE audit_logs (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     entity_type VARCHAR(100) NOT NULL, -- e.g., 'booking', 'payment', 'flight'
-    entity_id UNIQUEIDENTIFIER NOT NULL,
+    entity_id UUID NOT NULL,
     action VARCHAR(50) NOT NULL, -- created, updated, deleted, cancelled, etc.
-    performed_by UNIQUEIDENTIFIER, -- user_id who performed the action
-    timestamp DATETIME2 DEFAULT SYSUTCDATETIME(),
-    details NVARCHAR(MAX), -- JSON string for additional details
+    performed_by UUID, -- user_id who performed the action
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    details JSONB, -- JSON for additional details
     ip_address VARCHAR(50),
-    user_agent NVARCHAR(500)
+    user_agent VARCHAR(500)
 );
 
 -- Create indexes for audit_logs

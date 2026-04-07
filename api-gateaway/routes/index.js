@@ -8,6 +8,9 @@ const paymentRoutes = require('./payment');
 const flightRoutes = require('./flights');
 const trainRoutes = require('./trains');
 const hotelRoutes = require('./hotels');
+const profileRoutes = require('./profile');
+const pricingRoutes = require('./pricing');
+const adminRoutes = require('./admin');
 
 // Health check
 router.get('/health', (req, res) => {
@@ -26,6 +29,9 @@ router.use('/payments', paymentRoutes);
 router.use('/flights', flightRoutes);
 router.use('/trains', trainRoutes);
 router.use('/hotels', hotelRoutes);
+router.use('/profile', profileRoutes);
+router.use('/pricing', pricingRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;
 

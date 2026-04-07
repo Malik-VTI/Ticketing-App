@@ -1,0 +1,127 @@
+.admin-dashboard {
+  padding: 2rem 0;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.admin-header h1 {
+  margin: 0;
+  color: #1f2937;
+}
+
+.welcome-text {
+  color: #6b7280;
+  margin-top: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.btn-refresh {
+  padding: 0.75rem 1.5rem;
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-refresh:hover {
+  background-color: #e5e7eb;
+}
+
+.metrics-section h2, .admin-actions h2 {
+  font-size: 1.5rem;
+  color: #374151;
+  margin-bottom: 1.5rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.metric-icon {
+  font-size: 2.5rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f3f4f6;
+}
+
+.revenue .metric-icon { background: #dcfce7; color: #166534; }
+.users .metric-icon { background: #dbeafe; color: #1e40af; }
+.bookings .metric-icon { background: #fef3c7; color: #92400e; }
+.inventory .metric-icon { background: #f3f4f6; color: #4b5563; }
+
+.metric-content h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.metric-value {
+  margin: 0.5rem 0 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.action-card {
+  display: block;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.action-card h3 {
+  color: #2563eb;
+  margin: 0 0 0.5rem 0;
+}
+
+.action-card p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.action-card:hover {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}

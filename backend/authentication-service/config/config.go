@@ -46,11 +46,11 @@ func LoadConfig() *Config {
 			Host: getEnv("AUTH_SERVICE_HOST", getEnv("SERVER_HOST", "0.0.0.0")),
 		},
 		Database: DatabaseConfig{
-			Server:   getEnv("DB_SERVER", "10.100.33.68"),
+			Server:   getEnv("DB_SERVER", "10.100.33.184"),
 			Database: getEnv("DB_DATABASE", "ticketing_app"),
-			UserID:   getEnv("DB_USER", "lek"),
+			UserID:   getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "P@ssw0rd"),
-			Port:     getEnvAsInt("DB_PORT", 1433),
+			Port:     getEnvAsInt("DB_PORT", 5432),
 		},
 		JWT: JWTConfig{
 			SecretKey:     getEnv("JWT_SECRET_KEY", "bGZiXRX7b3FPCzLWkfRLiUtrQ+lknCeKMtSF9+oJKNI="),

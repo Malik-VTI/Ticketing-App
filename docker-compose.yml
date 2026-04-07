@@ -30,9 +30,10 @@ services:
       - BOOKING_SERVICE_URL=http://booking-service:8082
       - FLIGHT_SERVICE_URL=http://flight-service:8083
       - TRAIN_SERVICE_URL=http://train-service:8084
-      - PROFILE_SERVICE_URL=http://profile-service:8085
+      - PROFILE_SERVICE_URL=http://profile-service:8090
       - PRICING_SERVICE_URL=http://pricing-service:8086
       - NOTIFICATION_SERVICE_URL=http://notification-service:8087
+      - PAYMENT_SERVICE_URL=http://payment-service:8089
       - ADMIN_SERVICE_URL=http://admin-service:8088
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     depends_on:
@@ -43,6 +44,7 @@ services:
       - profile-service
       - pricing-service
       - notification-service
+      - payment-service
       - admin-service
     networks:
       - ticketing-network
@@ -82,6 +84,46 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - REDIS_ENABLED=${REDIS_ENABLED}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8087
+      - TRAIN_SERVICE_URL=http://train-service:8084
+      - FLIGHT_SERVICE_URL=http://flight-service:8083
+      - HOTEL_SERVICE_URL=http://hotel-service:8085
+      - PRICING_SERVICE_URL=http://pricing-service:8086
+    depends_on:
+      - redis
+    networks:
+      - ticketing-network
+    restart: unless-stopped
+
+  # Payment Service (Go)
+  payment-service:
+    build:
+      context: ./backend/payment-service
+      dockerfile: Dockerfile
+    container_name: ticketing-payment-service
+    ports:
+      - "8089:8089"
+    environment:
+      - DB_SERVER=${DB_SERVER}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PORT=${DB_PORT}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - BOOKING_SERVICE_URL=http://booking-service:8082
+    networks:
+      - ticketing-network
+    restart: unless-stopped
+
+  # Redis (for seat locking)
+  redis:
+    image: redis:7-alpine
+    container_name: ticketing-redis
+    ports:
+      - "6379:6379"
     networks:
       - ticketing-network
     restart: unless-stopped
@@ -101,6 +143,25 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT}
       - FLIGHT_SERVICE_PORT=8083
+    networks:
+      - ticketing-network
+    restart: unless-stopped
+
+  # Hotel Service (Go)
+  hotel-service:
+    build:
+      context: ./backend/catalog-service/hotel-service
+      dockerfile: Dockerfile
+    container_name: ticketing-hotel-service
+    ports:
+      - "8085:8085"
+    environment:
+      - DB_SERVER=${DB_SERVER}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PORT=${DB_PORT}
+      - PORT=8085
     networks:
       - ticketing-network
     restart: unless-stopped
@@ -131,14 +192,14 @@ services:
       dockerfile: Dockerfile
     container_name: ticketing-profile-service
     ports:
-      - "8085:8085"
+      - "8090:8090"
     environment:
       - DB_SERVER=${DB_SERVER}
       - DB_DATABASE=${DB_DATABASE}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT}
-      - PROFILE_SERVICE_PORT=8085
+      - PROFILE_SERVICE_PORT=8090
     networks:
       - ticketing-network
     restart: unless-stopped

@@ -3,10 +3,10 @@ spring:
     name: flight-service
   
   datasource:
-    url: jdbc:sqlserver://${DB_SERVER:10.100.33.68}:${DB_PORT:1433};databaseName=${DB_DATABASE:ticketing_app};encrypt=false;trustServerCertificate=true
-    username: ${DB_USER:lek}
+    url: jdbc:postgresql://${DB_SERVER:10.100.33.184}:${DB_PORT:5432}/${DB_DATABASE:ticketing_app}
+    username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:P@ssw0rd}
-    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    driver-class-name: org.postgresql.Driver
   
   jpa:
     hibernate:
@@ -14,7 +14,7 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.SQLServerDialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
 server:

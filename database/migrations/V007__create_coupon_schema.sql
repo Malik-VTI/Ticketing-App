@@ -4,7 +4,7 @@
 
 -- Create coupons table
 CREATE TABLE coupons (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(50) UNIQUE NOT NULL,
     discount_type VARCHAR(20) NOT NULL, -- percentage, fixed_amount
     value DECIMAL(18,2) NOT NULL,
@@ -12,18 +12,18 @@ CREATE TABLE coupons (
     end_date DATE NOT NULL,
     usage_limit INT, -- NULL means unlimited
     usage_count INT DEFAULT 0,
-    is_active BIT DEFAULT 1,
-    created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    updated_at DATETIME2
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
 );
 
 -- Create booking_coupons table (junction table for bookings and coupons)
 CREATE TABLE booking_coupons (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    booking_id UNIQUEIDENTIFIER NOT NULL,
-    coupon_id UNIQUEIDENTIFIER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL,
+    coupon_id UUID NOT NULL,
     discount_amount DECIMAL(18,2) NOT NULL,
-    created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT FK_booking_coupon_booking FOREIGN KEY (booking_id) REFERENCES bookings(id),
     CONSTRAINT FK_booking_coupon_coupon FOREIGN KEY (coupon_id) REFERENCES coupons(id)
 );

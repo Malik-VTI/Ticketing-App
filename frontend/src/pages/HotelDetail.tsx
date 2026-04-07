@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { hotelAPI, Hotel, AvailableRoomInfo, bookingAPI } from '../services/api'
+import { hotelAPI, Hotel, AvailableRoomInfo, bookingAPI, PricingResponse } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
+import Skeleton from '../components/Skeleton'
+import PromoCodeInput from '../components/PromoCodeInput'
 import './HotelDetail.css'
 
 const HotelDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { showToast } = useToast()
+  
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [rooms, setRooms] = useState<AvailableRoomInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -28,31 +33,25 @@ const HotelDetail = () => {
   })
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState('')
+  const [calculatedPricing, setCalculatedPricing] = useState<PricingResponse | null>(null)
 
   useEffect(() => {
-    if (id) {
-      loadHotel()
-    }
+    if (id) loadHotel()
   }, [id])
 
   useEffect(() => {
-    if (hotel && id) {
-      loadRooms()
-    }
+    if (hotel && id) loadRooms()
   }, [hotel, searchParams.checkin, searchParams.checkout, searchParams.guests])
 
   const loadHotel = async () => {
     if (!id) return
-
     setLoading(true)
     setError('')
     try {
       const hotelData = await hotelAPI.getHotelById(id)
       setHotel(hotelData)
     } catch (err: any) {
-      console.error('Error loading hotel:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load hotel'
-      setError(errorMessage)
+      setError(err.response?.data?.message || err.message || 'Failed to load hotel')
     } finally {
       setLoading(false)
     }
@@ -60,20 +59,14 @@ const HotelDetail = () => {
 
   const loadRooms = async () => {
     if (!id) return
-
     setLoadingRooms(true)
-    setError('')
     try {
-      const roomsData = await hotelAPI.getHotelRooms(id, {
-        checkin: searchParams.checkin,
-        checkout: searchParams.checkout,
-        guests: searchParams.guests,
-      })
+      const roomsData = await hotelAPI.getHotelRooms(id, searchParams)
       setRooms(roomsData)
     } catch (err: any) {
-      console.error('Error loading rooms:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load rooms'
-      setError(errorMessage)
+      // Don't override primary screen error unless necessary, just log or silent fail available rooms load
+      console.error('Failed to load rooms', err)
+      setRooms([])
     } finally {
       setLoadingRooms(false)
     }
@@ -87,12 +80,14 @@ const HotelDetail = () => {
     }))
   }
 
+  /* Booking Logic */
   const handleBookNow = (room: AvailableRoomInfo) => {
+    if (!room?.roomTypeId) {
+      setError('Room data is unavailable. Please refresh.')
+      return
+    }
     setSelectedRoom(room)
-    setBookingForm({
-      numRooms: 1,
-      guestNames: [''],
-    })
+    setBookingForm({ numRooms: 1, guestNames: [''] })
     setBookingError('')
     setShowBookingModal(true)
   }
@@ -101,6 +96,7 @@ const HotelDetail = () => {
     setShowBookingModal(false)
     setSelectedRoom(null)
     setBookingError('')
+    setCalculatedPricing(null)
   }
 
   const handleBookingFormChange = (field: string, value: any) => {
@@ -108,10 +104,8 @@ const HotelDetail = () => {
       const updated = { ...prev, [field]: value }
       if (field === 'numRooms') {
         const num = parseInt(value, 10)
-        // Prevent NaN or invalid numbers
-        if (isNaN(num) || num < 1) {
-          return prev // Don't update if invalid
-        }
+        if (isNaN(num) || num < 1) return prev
+        updated.numRooms = num
         updated.guestNames = Array(num).fill('').map((_, i) => prev.guestNames[i] || '')
       }
       return updated
@@ -127,36 +121,23 @@ const HotelDetail = () => {
 
   const handleSubmitBooking = async () => {
     if (!selectedRoom || !hotel) return
-
-    if (!bookingForm.numRooms || bookingForm.numRooms < 1) {
-      setBookingError('Please enter a valid number of rooms')
-      return
-    }
-
-    if (bookingForm.guestNames.some((name) => !name.trim())) {
-      setBookingError('Please enter all guest names')
-      return
-    }
-
-    if (!user) {
-      setBookingError('You must be logged in to create a booking')
-      return
-    }
+    if (bookingForm.guestNames.some((name) => !name.trim())) return setBookingError('Please enter all guest names')
+    if (!user) return setBookingError('You must be logged in to create a booking')
+    if (!calculatedPricing) return setBookingError('Pricing is still calculating or failed.')
 
     setBookingLoading(true)
     setBookingError('')
 
     try {
-      const totalPrice = selectedRoom.minPrice * bookingForm.numRooms
-
+      const itemPrice = calculatedPricing.totalPrice / bookingForm.numRooms
       await bookingAPI.createBooking({
         booking_type: 'hotel',
         items: [
           {
             item_type: 'hotel',
             item_ref_id: selectedRoom.roomTypeId,
-            price: totalPrice,
-            quantity: bookingForm.numRooms,
+            price: itemPrice,
+            quantity: Number(bookingForm.numRooms),
             metadata: {
               room_numbers: [],
               passenger_names: bookingForm.guestNames,
@@ -166,13 +147,11 @@ const HotelDetail = () => {
           },
         ],
       })
-
       handleCloseModal()
-      alert('Booking created successfully!')
+      showToast('Hotel booked successfully!', 'success')
       navigate('/bookings')
     } catch (err: any) {
-      console.error('Booking error:', err)
-      setBookingError(err.response?.data?.message || 'Failed to create booking. Please try again.')
+      setBookingError(err.response?.data?.message || 'Failed to create booking.')
     } finally {
       setBookingLoading(false)
     }
@@ -180,186 +159,171 @@ const HotelDetail = () => {
 
   if (loading) {
     return (
-      <div className="hotel-detail">
-        <div className="loading">Loading hotel details...</div>
+      <div className="hotel-detail-page container">
+        <Skeleton type="card" height="400px" />
       </div>
     )
   }
 
   if (error && !hotel) {
     return (
-      <div className="hotel-detail">
-        <div className="error-message">{error}</div>
-        <Link to="/hotels" className="btn-back">
-          ← Back to Hotels
-        </Link>
+      <div className="hotel-detail-page container">
+        <div className="alert-error"><span className="alert-icon">⚠️</span>{error}</div>
+        <Link to="/hotels" className="btn-back">← Back to Hotels</Link>
       </div>
     )
   }
 
-  if (!hotel) {
-    return (
-      <div className="hotel-detail">
-        <div className="error-message">Hotel not found</div>
-        <Link to="/hotels" className="btn-back">
-          ← Back to Hotels
-        </Link>
-      </div>
-    )
-  }
+  if (!hotel) return null
 
   return (
-    <div className="hotel-detail">
-      <div className="hotel-detail-header">
-        <Link to="/hotels" className="btn-back">
-          ← Back to Hotels
-        </Link>
-        <h1>{hotel.name}</h1>
-        <div className="hotel-meta">
-          <p className="hotel-location">
-            📍 {hotel.city} {hotel.address && `• ${hotel.address}`}
-          </p>
-          {hotel.rating && (
-            <p className="hotel-rating">
-              ⭐ {hotel.rating.toFixed(1)} Rating
-            </p>
-          )}
+    <div className="hotel-detail-page container">
+      {/* Top Breadcrumb & Actions */}
+      <div className="detail-nav-bar">
+        <Link to="/hotels" className="btn-back">← Back</Link>
+        <div className="detail-nav-actions">
+          <button className="icon-btn-outline"><span>🔖</span> Save</button>
+          <button className="icon-btn-outline"><span>↗️</span> Share</button>
         </div>
       </div>
 
-      <div className="search-filters">
-        <h2>Search Available Rooms</h2>
-        <div className="filter-grid">
-          <div className="form-group">
-            <label htmlFor="checkin">Check-in Date</label>
-            <input
-              type="date"
-              id="checkin"
-              name="checkin"
-              value={searchParams.checkin}
-              onChange={handleInputChange}
-              required
-            />
+      {/* Hero Header Region */}
+      <div className="detail-hero">
+        <div className="detail-hero-info">
+          <h1>{hotel.name}</h1>
+          <div className="rating">
+            <span className="star">★</span> {hotel.rating != null ? hotel.rating.toFixed(1) : '4.5'} 
+            <span style={{color: 'var(--text-light)', marginLeft: '8px', fontSize: '0.9rem'}}>Excellent</span>
           </div>
-
-          <div className="form-group">
-            <label htmlFor="checkout">Check-out Date</label>
-            <input
-              type="date"
-              id="checkout"
-              name="checkout"
-              value={searchParams.checkout}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="guests">Guests</label>
-            <select
-              id="guests"
-              name="guests"
-              value={searchParams.guests}
-              onChange={handleInputChange}
-            >
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <option key={num} value={num}>
-                  {num} {num === 1 ? 'Guest' : 'Guests'}
-                </option>
-              ))}
-            </select>
+          <p className="location-text">📍 {hotel.city} {hotel.address && `• ${hotel.address}`}</p>
+        </div>
+        
+        {/* Mock Gallery */}
+        <div className="detail-gallery">
+          <div className="main-image"></div>
+          <div className="side-images">
+            <div className="img-box"></div>
+            <div className="img-box"></div>
           </div>
         </div>
       </div>
 
-      {error && (
-        <div className="error-message" role="alert">
-          {error}
-        </div>
-      )}
+      <div className="detail-content-layout">
+        
+        {/* Left Column: Description & Search */}
+        <div className="detail-main-col">
+          <section className="about-section detail-card">
+            <h2>About this property</h2>
+            <p>Welcome to {hotel.name}, a premier destination in {hotel.city}. Enjoy world-class amenities and comfortable stays suited for leisure and business trips alike. Our facilities are designed to guarantee an unforgettable experience.</p>
+            <div className="amenities-highlights">
+              <span>🏊 Pool</span>
+              <span>📶 Free WiFi</span>
+              <span>🏋️ Fitness Center</span>
+              <span>🍽️ Restaurant</span>
+            </div>
+          </section>
 
-      <div className="rooms-section">
-        <h2>Available Rooms</h2>
-        {loadingRooms ? (
-          <div className="loading">Loading rooms...</div>
-        ) : rooms.length === 0 ? (
-          <div className="no-rooms">
-            <p>No rooms available for the selected dates and guest count.</p>
-            <p className="hint">Try adjusting your check-in/check-out dates or number of guests.</p>
-          </div>
-        ) : (
-          <div className="rooms-grid">
-            {rooms.map((room) => (
-              <div className="room-card" key={room.roomTypeId}>
-                <div className="room-card-header">
-                  <h3>{room.roomTypeName}</h3>
-                  <span className="room-capacity-badge">
-                    {room.capacity} {room.capacity === 1 ? 'Guest' : 'Guests'}
-                  </span>
+          <section className="rooms-search-section detail-card">
+            <h2>Search Available Rooms</h2>
+            <div className="search-bar inline-search">
+              <div className="search-field">
+                <label>Check-in</label>
+                <div className="input-with-icon">
+                  <span>📅</span>
+                  <input type="date" name="checkin" value={searchParams.checkin} onChange={handleInputChange}/>
                 </div>
-                <div className="room-card-body">
-                  <div className="room-availability-info">
-                    <p className="availability-text">
-                      <span className="available-count">{room.availableCount}</span> /{' '}
-                      <span className="total-count">{room.totalCount}</span> rooms available
-                    </p>
-                  </div>
-                  {room.minPrice > 0 && (
-                    <div className="room-price-info">
-                      <p className="price-label">Starting from</p>
-                      <p className="price-amount">
-                        {room.currency} {room.minPrice.toLocaleString()}
-                      </p>
-                      <p className="price-note">per night</p>
+              </div>
+              <div className="search-field">
+                <label>Check-out</label>
+                <div className="input-with-icon">
+                  <span>📅</span>
+                  <input type="date" name="checkout" value={searchParams.checkout} onChange={handleInputChange}/>
+                </div>
+              </div>
+              <div className="search-field">
+                <label>Guests</label>
+                <div className="input-with-icon">
+                  <span>👥</span>
+                  <select name="guests" value={searchParams.guests} onChange={handleInputChange}>
+                    {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Guest{(n>1)?'s':''}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="available-rooms-section">
+            <h2>Available Rooms</h2>
+            {loadingRooms ? (
+              <Skeleton type="card" height="150px" count={3} />
+            ) : rooms.length === 0 ? (
+              <div className="no-rooms-box">
+                <p>No rooms available for your selected dates.</p>
+              </div>
+            ) : (
+              <div className="room-list">
+                {rooms.map(room => (
+                  <div className="room-row-card" key={room.roomTypeId}>
+                    <div className="room-image-mock">🛏️</div>
+                    <div className="room-row-content">
+                      <div className="r-head">
+                        <h3>{room.roomTypeName}</h3>
+                        <span className="room-badge">Max {room.capacity} Guests</span>
+                      </div>
+                      <p className="r-desc">Spacious and comfortable room featuring essential amenities for a pleasant stay.</p>
+                      <div className="r-facilities">
+                        <span>🚿 Private Bath</span>
+                        <span>📺 TV</span>
+                        <span>❄️ AC</span>
+                      </div>
+                      
+                      <div className="r-bottom">
+                        <div className="r-avail text-success">Only {room.availableCount} left!</div>
+                        <div className="r-price-action">
+                          <div className="price">Starting <span>{room.currency} {room.minPrice?.toLocaleString() ?? 'N/A'}</span> /night</div>
+                          <button className="btn-buy-now" onClick={() => handleBookNow(room)} disabled={room.availableCount===0}>
+                            Select Room
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="room-card-footer">
-                  <button
-                    className="btn-book"
-                    disabled={room.availableCount === 0}
-                    onClick={() => handleBookNow(room)}
-                  >
-                    {room.availableCount === 0 ? 'Not Available' : 'Book Now'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {hotel.roomTypes && hotel.roomTypes.length > 0 && (
-        <div className="room-types-section">
-          <h2>Room Types</h2>
-          <div className="room-types-grid">
-            {hotel.roomTypes.map((rt) => (
-              <div className="room-type-info" key={rt.id}>
-                <h3>{rt.name}</h3>
-                <p>Capacity: {rt.capacity} {rt.capacity === 1 ? 'guest' : 'guests'}</p>
-                {rt.amenities && (
-                  <div className="amenities">
-                    <p className="amenities-label">Amenities:</p>
-                    <p className="amenities-text">{rt.amenities}</p>
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </section>
         </div>
-      )}
+
+        {/* Right Sticky Sidebar: Overview Map */}
+        <aside className="detail-sidebar">
+          <div className="widget-card location-widget">
+            <h3>Location Map</h3>
+            <div className="map-mock">🗺️</div>
+            <p className="map-desc">{hotel.address}, {hotel.city}</p>
+            <button className="btn-outline-full">View on map</button>
+          </div>
+
+          <div className="widget-card policy-widget">
+            <h3>Hotel Policy</h3>
+            <ul className="policy-list">
+              <li><strong>Check-in:</strong> 14:00</li>
+              <li><strong>Check-out:</strong> 12:00</li>
+              <li>Valid ID required upon checkin.</li>
+              <li>No smoking in indoor premises.</li>
+            </ul>
+          </div>
+        </aside>
+
+      </div>
 
       {/* Booking Modal */}
-      {showBookingModal && selectedRoom && hotel && (
+      {showBookingModal && selectedRoom && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Book Room</h2>
-              <button className="modal-close" onClick={handleCloseModal}>
-                ×
-              </button>
+              <h2>Complete Booking</h2>
+              <button className="modal-close" onClick={handleCloseModal}>×</button>
             </div>
-
             <div className="modal-body">
               <div className="booking-summary">
                 <h3>{hotel.name}</h3>
@@ -368,63 +332,40 @@ const HotelDetail = () => {
                   {new Date(searchParams.checkin).toLocaleDateString()} → {new Date(searchParams.checkout).toLocaleDateString()}
                 </p>
               </div>
-
+              
               {bookingError && (
-                <div className="error-message" role="alert">
-                  {bookingError}
+                <div className="alert-error" style={{marginTop: '1rem'}}>
+                  <span className="alert-icon">⚠️</span>{bookingError}
                 </div>
               )}
 
-              <div className="booking-form">
+              <div className="booking-form" style={{marginTop: '1.5rem'}}>
                 <div className="form-group">
-                  <label htmlFor="numRooms">Number of Rooms</label>
-                  <input
-                    type="number"
-                    id="numRooms"
-                    min="1"
-                    max={selectedRoom.availableCount}
-                    value={bookingForm.numRooms}
-                    onChange={(e) => handleBookingFormChange('numRooms', e.target.value)}
-                    required
-                  />
-                  <small>Maximum {selectedRoom.availableCount} rooms available</small>
+                  <label>Quantity</label>
+                  <input type="number" min="1" max={selectedRoom.availableCount} value={bookingForm.numRooms} onChange={(e) => handleBookingFormChange('numRooms', e.target.value)} required />
                 </div>
-
-                <div className="guest-names">
-                  <label>Guest Names (Primary guest per room)</label>
+                
+                <div className="passenger-names">
+                  <label>Guest Names (Primary per room)</label>
                   {bookingForm.guestNames.map((name, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      placeholder={`Guest ${index + 1} name`}
-                      value={name}
-                      onChange={(e) => handleGuestNameChange(index, e.target.value)}
-                      required
-                    />
+                    <input key={index} type="text" placeholder={`Guest ${index + 1}`} value={name} onChange={(e) => handleGuestNameChange(index, e.target.value)} required />
                   ))}
                 </div>
 
-                <div className="price-summary">
-                  <p className="total-price">
-                    Total Price: {selectedRoom.currency} {(selectedRoom.minPrice * bookingForm.numRooms).toLocaleString()}
-                  </p>
-                  <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
-                    {selectedRoom.currency} {selectedRoom.minPrice.toLocaleString()} per night × {bookingForm.numRooms} room(s)
-                  </p>
+                <div className="price-summary" style={{ padding: 0, border: 'none', marginTop: '1rem', background: 'transparent' }}>
+                  <PromoCodeInput 
+                    basePrice={selectedRoom.minPrice * bookingForm.numRooms} 
+                    currency={selectedRoom.currency} 
+                    onPriceCalculated={setCalculatedPricing} 
+                    onError={setBookingError} 
+                  />
                 </div>
               </div>
             </div>
-
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={handleCloseModal} disabled={bookingLoading}>
-                Cancel
-              </button>
-              <button
-                className="btn-submit"
-                onClick={handleSubmitBooking}
-                disabled={bookingLoading}
-              >
-                {bookingLoading ? 'Processing...' : 'Confirm Booking'}
+              <button className="btn-cancel" onClick={handleCloseModal} disabled={bookingLoading}>Cancel</button>
+              <button className="btn-submit" onClick={handleSubmitBooking} disabled={bookingLoading || !calculatedPricing}>
+                {bookingLoading ? 'Processing...' : 'Confirm Details'}
               </button>
             </div>
           </div>
@@ -435,4 +376,3 @@ const HotelDetail = () => {
 }
 
 export default HotelDetail
-

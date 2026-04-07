@@ -1,13 +1,13 @@
 #!/bin/bash
-# Bash Script to Run All Migrations
-# Usage: ./run_migrations.sh -s localhost -d ticketing_db -u sa -p YourPassword
+# Bash Script to Run All Migrations (PostgreSQL)
+# Usage: ./run_migrations.sh -s localhost -d ticketing_app -u postgres -p YourPassword
 
 # Default values
 SERVER="localhost"
-DATABASE="ticketing_db"
-USER="sa"
+DATABASE="ticketing_app"
+USER="postgres"
 PASSWORD=""
-TRUST_CERT="true"
+PORT="5432"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -26,6 +26,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -p|--password)
             PASSWORD="$2"
+            shift 2
+            ;;
+        --port)
+            PORT="$2"
             shift 2
             ;;
         *)
@@ -47,27 +51,14 @@ echo "Database: $DATABASE"
 echo "Migrations Path: $MIGRATIONS_PATH"
 echo ""
 
-# Check if sqlcmd is available
-if ! command -v sqlcmd &> /dev/null; then
-    echo "ERROR: sqlcmd is not available. Please install SQL Server Command Line Utilities."
-    echo "For Linux: https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools"
+# Check if psql is available
+if ! command -v psql &> /dev/null; then
+    echo "ERROR: psql is not available. Please install PostgreSQL client tools."
     exit 1
 fi
 
-# Build connection string
-CONNECTION_STRING="-S $SERVER -d $DATABASE"
-if [ -n "$USER" ]; then
-    CONNECTION_STRING="$CONNECTION_STRING -U $USER"
-    if [ -n "$PASSWORD" ]; then
-        CONNECTION_STRING="$CONNECTION_STRING -P $PASSWORD"
-    fi
-else
-    CONNECTION_STRING="$CONNECTION_STRING -E" # Use Windows Authentication
-fi
-
-if [ "$TRUST_CERT" = "true" ]; then
-    CONNECTION_STRING="$CONNECTION_STRING -C"
-fi
+# Build connection args
+CONNECTION_ARGS=(-h "$SERVER" -p "$PORT" -U "$USER" -d "$DATABASE" -v ON_ERROR_STOP=1)
 
 # Get all migration files in order
 MIGRATION_FILES=$(ls -1 "$MIGRATIONS_PATH"/V*.sql 2>/dev/null | sort)
@@ -90,7 +81,7 @@ FAIL_COUNT=0
 for file in $MIGRATION_FILES; do
     echo "Running: $(basename "$file")..."
     
-    if sqlcmd $CONNECTION_STRING -i "$file"; then
+    if PGPASSWORD="$PASSWORD" psql "${CONNECTION_ARGS[@]}" -f "$file"; then
         echo "  ✓ Success"
         ((SUCCESS_COUNT++))
     else
@@ -113,7 +104,7 @@ echo ""
 
 if [ $FAIL_COUNT -eq 0 ]; then
     echo "All migrations completed successfully!"
-    echo "You can now verify the setup by running: sqlcmd $CONNECTION_STRING -i verify_setup.sql"
+    echo "You can now verify the setup by running: PGPASSWORD=... psql -h $SERVER -p $PORT -U $USER -d $DATABASE -f verify_setup.sql"
     exit 0
 else
     echo "Some migrations failed. Please check the errors above."

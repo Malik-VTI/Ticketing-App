@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { authAPI, AuthResponse } from '../services/api'
 
 interface User {
@@ -15,6 +15,7 @@ interface AuthContextType {
   register: (email: string, password: string, fullName: string, phone?: string) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
+  refreshAccessToken: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -22,6 +23,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  // Ref to allow api.ts interceptor to call refresh without circular dependency
+  const refreshFnRef = useRef<(() => Promise<string | null>) | null>(null)
 
   useEffect(() => {
     // Check if user is already logged in
@@ -44,11 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     try {
       const response: AuthResponse = await authAPI.login({ email, password })
-      
+
       localStorage.setItem('access_token', response.access_token)
       localStorage.setItem('refresh_token', response.refresh_token)
       localStorage.setItem('user', JSON.stringify(response.user))
-      
+
       setUser(response.user)
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed')
@@ -63,11 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         full_name: fullName,
         phone,
       })
-      
+
       localStorage.setItem('access_token', response.access_token)
       localStorage.setItem('refresh_token', response.refresh_token)
       localStorage.setItem('user', JSON.stringify(response.user))
-      
+
       setUser(response.user)
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed')
@@ -81,6 +84,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null)
   }
 
+  /**
+   * Attempts to refresh the access token using the stored refresh token.
+   * Returns the new access token on success, or null if refresh fails.
+   * On failure it clears auth state (equivalent to logout).
+   */
+  const refreshAccessToken = async (): Promise<string | null> => {
+    const storedRefreshToken = localStorage.getItem('refresh_token')
+    if (!storedRefreshToken) {
+      logout()
+      return null
+    }
+
+    try {
+      const response: AuthResponse = await authAPI.refreshToken(storedRefreshToken)
+      localStorage.setItem('access_token', response.access_token)
+      localStorage.setItem('refresh_token', response.refresh_token)
+      localStorage.setItem('user', JSON.stringify(response.user))
+      setUser(response.user)
+      return response.access_token
+    } catch {
+      // Refresh token is also invalid/expired — force logout
+      logout()
+      return null
+    }
+  }
+
+  // Expose refresh function via ref so api.ts interceptor can call it
+  useEffect(() => {
+    refreshFnRef.current = refreshAccessToken
+  }, [])
+
+  // Attach ref to window for the axios interceptor to access without circular imports
+  useEffect(() => {
+    (window as any).__refreshAccessToken = refreshAccessToken
+    return () => {
+      delete (window as any).__refreshAccessToken
+    }
+  }, [])
+
   const value: AuthContextType = {
     user,
     loading,
@@ -88,6 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     register,
     logout,
     isAuthenticated: !!user,
+    refreshAccessToken,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -100,4 +143,3 @@ export const useAuth = () => {
   }
   return context
 }
-

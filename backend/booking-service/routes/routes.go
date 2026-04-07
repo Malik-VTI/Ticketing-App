@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"booking-service/clients"
 	"booking-service/handlers"
 	"booking-service/middleware"
 	"booking-service/repository"
@@ -29,8 +30,12 @@ func SetupRoutes(
 		c.Next()
 	})
 
+	// Initialize clients
+	catalogClient := clients.NewCatalogClient()
+	pricingClient := clients.NewPricingClient()
+
 	// Initialize services and handlers
-	bookingService := service.NewBookingService(bookingRepo, bookingItemRepo)
+	bookingService := service.NewBookingService(bookingRepo, bookingItemRepo, catalogClient, pricingClient)
 	bookingHandler := handlers.NewBookingHandler(bookingService)
 
 	// Health check
@@ -50,6 +55,12 @@ func SetupRoutes(
 		protected.GET("/:id", bookingHandler.GetBooking)
 		protected.GET("/user/:userId", bookingHandler.GetUserBookings)
 		protected.POST("/:id/cancel", bookingHandler.CancelBooking)
+	}
+
+	// Internal route — no auth required (called by payment-service)
+	internal := router.Group("/bookings")
+	{
+		internal.POST("/:id/confirm", bookingHandler.ConfirmBooking)
 	}
 
 	return router

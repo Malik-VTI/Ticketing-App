@@ -22,7 +22,7 @@ const config = {
       timeout: 10000,
     },
     payment: {
-      baseUrl: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8082',
+      baseUrl: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8089',
       timeout: 10000,
     },
     flight: {
@@ -42,7 +42,7 @@ const config = {
       timeout: 5000,
     },
     profile: {
-      baseUrl: process.env.PROFILE_SERVICE_URL || 'http://localhost:8087',
+      baseUrl: process.env.PROFILE_SERVICE_URL || 'http://localhost:8090',
       timeout: 5000,
     },
     notification: {
@@ -50,7 +50,7 @@ const config = {
       timeout: 5000,
     },
     admin: {
-      baseUrl: process.env.ADMIN_SERVICE_URL || 'http://localhost:8089',
+      baseUrl: process.env.ADMIN_SERVICE_URL || 'http://localhost:8088',
       timeout: 5000,
     },
   },

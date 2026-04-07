@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"hotel-service/database"
 	"hotel-service/models"
 	"hotel-service/repository"
 
@@ -13,10 +14,10 @@ import (
 )
 
 type HotelHandler struct {
-	hotelRepo      repository.HotelRepository
-	roomTypeRepo   repository.RoomTypeRepository
-	roomRepo       repository.RoomRepository
-	roomRateRepo   repository.RoomRateRepository
+	hotelRepo    repository.HotelRepository
+	roomTypeRepo repository.RoomTypeRepository
+	roomRepo     repository.RoomRepository
+	roomRateRepo repository.RoomRateRepository
 }
 
 func NewHotelHandler(
@@ -26,10 +27,10 @@ func NewHotelHandler(
 	roomRateRepo repository.RoomRateRepository,
 ) *HotelHandler {
 	return &HotelHandler{
-		hotelRepo:      hotelRepo,
-		roomTypeRepo:   roomTypeRepo,
-		roomRepo:       roomRepo,
-		roomRateRepo:   roomRateRepo,
+		hotelRepo:    hotelRepo,
+		roomTypeRepo: roomTypeRepo,
+		roomRepo:     roomRepo,
+		roomRateRepo: roomRateRepo,
 	}
 }
 
@@ -195,7 +196,7 @@ func (h *HotelHandler) GetRooms(c *gin.Context) {
 	checkOutStr := c.Query("checkout")
 	guestsStr := c.Query("guests")
 
-	var availableRooms []models.AvailableRoomInfo
+	availableRooms := make([]models.AvailableRoomInfo, 0)
 
 	for _, rt := range roomTypes {
 		// Filter by capacity if guests specified
@@ -213,7 +214,7 @@ func (h *HotelHandler) GetRooms(c *gin.Context) {
 		}
 
 		// Get available rooms
-		availableRoomsList, err := h.roomRepo.FindAvailableByRoomTypeID(rt.ID)
+		availableRoomsList, err := h.roomRepo.FindAvailableByRoomTypeID(rt.ID, checkInStr, checkOutStr)
 		if err != nil {
 			continue
 		}
@@ -262,6 +263,50 @@ func (h *HotelHandler) GetRooms(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, availableRooms)
+}
+
+// ReserveRooms handles POST /hotels/:id/reserve
+func (h *HotelHandler) ReserveRooms(c *gin.Context) {
+	var req models.ReserveRoomsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "validation_error",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Begin transaction
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to start transaction",
+		})
+		return
+	}
+	defer tx.Rollback()
+
+	roomNumbers, err := h.roomRepo.ReserveRooms(tx, req.Quantity, req.RoomTypeID)
+	if err != nil {
+		c.JSON(http.StatusConflict, models.ErrorResponse{
+			Error:   "reservation_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to commit transaction",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ReserveRoomsResponse{
+		RoomNumbers: roomNumbers,
+	})
 }
 
 // GetRates handles GET /hotels/:id/rates
@@ -317,4 +362,3 @@ func (h *HotelHandler) Health(c *gin.Context) {
 		"service": "hotel-service",
 	})
 }
-

@@ -22,5 +22,8 @@ public interface FlightSeatRepository extends JpaRepository<FlightSeat, UUID> {
                                                            @Param("seatClass") String seatClass);
     
     Optional<FlightSeat> findByFlightScheduleIdAndSeatNumber(UUID flightScheduleId, String seatNumber);
+    
+    @Query("SELECT fs FROM FlightSeat fs WHERE fs.flightSchedule.id = :scheduleId AND fs.seatNumber IN :seatNumbers")
+    List<FlightSeat> findByFlightScheduleIdAndSeatNumberIn(@Param("scheduleId") UUID scheduleId, @Param("seatNumbers") List<String> seatNumbers);
 }
 

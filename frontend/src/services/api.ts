@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 
 const API_BASE_URL = 'http://localhost:3000/api'
 
@@ -23,17 +23,82 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle errors
+// Track whether a refresh is in-flight to prevent concurrent refresh calls
+let isRefreshing = false
+// Queue of callbacks waiting for a new token
+let refreshSubscribers: Array<(token: string | null) => void> = []
+
+const onTokenRefreshed = (token: string | null) => {
+  refreshSubscribers.forEach((cb) => cb(token))
+  refreshSubscribers = []
+}
+
+const subscribeToRefresh = (cb: (token: string | null) => void) => {
+  refreshSubscribers.push(cb)
+}
+
+// Response interceptor — auto-refresh JWT on 401 before giving up
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+  async (error) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Prevent infinite retry loops
+      originalRequest._retry = true
+
+      if (isRefreshing) {
+        // Another request already triggered a refresh — queue this one
+        return new Promise((resolve, reject) => {
+          subscribeToRefresh((newToken) => {
+            if (!newToken) {
+              reject(error)
+              return
+            }
+            if (originalRequest.headers) {
+              (originalRequest.headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`
+            }
+            resolve(api(originalRequest))
+          })
+        })
+      }
+
+      isRefreshing = true
+
+      try {
+        // Use the refresh function exposed by AuthContext through window
+        const refreshFn = (window as any).__refreshAccessToken as
+          | (() => Promise<string | null>)
+          | undefined
+
+        const newToken = refreshFn ? await refreshFn() : null
+
+        isRefreshing = false
+        onTokenRefreshed(newToken)
+
+        if (!newToken) {
+          // Refresh failed — redirect to login
+          window.location.href = '/login'
+          return Promise.reject(error)
+        }
+
+        // Retry the original request with the new token
+        if (originalRequest.headers) {
+          (originalRequest.headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`
+        }
+        return api(originalRequest)
+      } catch (refreshError) {
+        isRefreshing = false
+        onTokenRefreshed(null)
+        // Clear auth and redirect
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+        return Promise.reject(refreshError)
+      }
     }
+
     return Promise.reject(error)
   }
 )
@@ -61,6 +126,14 @@ export interface AuthResponse {
     full_name: string
     phone?: string
   }
+}
+
+export interface ProfileResponse {
+  id: string
+  email: string
+  fullName: string
+  phone: string
+  createdAt: string
 }
 
 export const authAPI = {
@@ -252,9 +325,9 @@ export const trainAPI = {
 
   getStations: async (): Promise<Station[]> => {
     const response = await api.get<Station[] | { content: Station[] }>('/trains/stations')
-    const data = response.data as any
+    const data = response.data as Station[] | { content: Station[] }
     if (Array.isArray(data)) return data
-    if (Array.isArray(data?.content)) return data.content
+    if (Array.isArray((data as { content: Station[] })?.content)) return (data as { content: Station[] }).content
     return []
   },
 
@@ -392,7 +465,7 @@ export interface Booking {
   booking_type: 'flight' | 'train' | 'hotel'
   total_amount: number
   currency: string
-  status: 'pending' | 'confirmed' | 'cancelled' | 'expired'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'expired' | 'initiated'
   items: BookingItem[]
   created_at: string
   updated_at?: string
@@ -440,5 +513,108 @@ export const bookingAPI = {
   },
 }
 
-export default api
+// Payment types
+export type PaymentStatus = 'initiated' | 'succeeded' | 'failed' | 'refunded'
+export type PaymentMethod = 'bank_transfer' | 'ewallet' | 'credit_card'
 
+export interface Payment {
+  id: string
+  booking_id: string
+  user_id: string
+  amount: number
+  currency: string
+  status: PaymentStatus
+  payment_method: PaymentMethod
+  created_at: string
+}
+
+export interface CreatePaymentRequest {
+  booking_id: string
+  amount: number
+  currency?: string
+  payment_method: PaymentMethod
+}
+
+export const paymentAPI = {
+  createPayment: async (request: CreatePaymentRequest): Promise<Payment> => {
+    const response = await api.post<Payment>('/payments', request)
+    return response.data
+  },
+
+  getPayment: async (id: string): Promise<Payment> => {
+    const response = await api.get<Payment>(`/payments/${id}`)
+    return response.data
+  },
+
+  refundPayment: async (id: string): Promise<Payment> => {
+    const response = await api.post<Payment>(`/payments/${id}/refund`)
+    return response.data
+  },
+}
+
+export const profileAPI = {
+  getProfile: async () => {
+    const response = await api.get<ProfileResponse>('/profile')
+    return response.data
+  },
+
+  updateProfile: async (data: { fullName?: string; phone?: string }) => {
+    const response = await api.put<ProfileResponse>('/profile', data)
+    return response.data
+  },
+
+  updatePassword: async (data: any) => {
+    const response = await api.put('/profile/password', data)
+    return response.data
+  },
+}
+
+export interface PricingResponse {
+  basePrice: number
+  tax: number
+  discount: number
+  totalPrice: number
+  currency: string
+}
+
+export const pricingAPI = {
+  calculatePrice: async (basePrice: number, couponCode?: string, currency?: string): Promise<PricingResponse> => {
+    const response = await api.get<PricingResponse>('/pricing/calculate', {
+      params: { basePrice, couponCode: couponCode || undefined, currency },
+    })
+    return response.data
+  },
+}
+
+export interface AdminMetricsResponse {
+  totalUsers: number
+  totalBookings: number
+  totalRevenue: number
+  totalFlights: number
+  totalTrains: number
+  totalHotels: number
+}
+
+export const adminAPI = {
+  getMetrics: async (): Promise<AdminMetricsResponse> => {
+    const response = await api.get<AdminMetricsResponse>('/admin/metrics')
+    return response.data
+  },
+
+  addFlight: async (data: any) => {
+    const response = await api.post('/admin/flights', data)
+    return response.data
+  },
+
+  addTrain: async (data: any) => {
+    const response = await api.post('/admin/trains', data)
+    return response.data
+  },
+
+  addHotel: async (data: any) => {
+    const response = await api.post('/admin/hotels', data)
+    return response.data
+  },
+}
+
+export default api

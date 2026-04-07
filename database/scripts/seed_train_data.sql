@@ -1,219 +1,173 @@
--- Seed Train Data Script
--- This script inserts sample train data for development and testing
--- Run this after the train schema migration (V003)
+-- Seed Train Data Script (PostgreSQL)
+-- Inserts sample train data for development and testing
+-- Run this after migrations (V003 at minimum)
 
-USE ticketing_app;
-GO
+-- Seeding train data...
 
-PRINT 'Seeding train data...';
-PRINT '';
+-- Ensure required extension exists (migrations should already do this)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Seed Stations
-PRINT 'Inserting sample train stations...';
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'GMR')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'GMR', 'Gambir', 'Jakarta');
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'BD')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'BD', 'Bandung', 'Bandung');
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'YK')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'YK', 'Yogyakarta', 'Yogyakarta');
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'SLO')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'SLO', 'Solo Balapan', 'Surakarta');
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'SBY')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'SBY', 'Surabaya Gubeng', 'Surabaya');
-IF NOT EXISTS (SELECT 1 FROM stations WHERE code = 'MLG')
-    INSERT INTO stations (id, code, name, city) VALUES (NEWID(), 'MLG', 'Malang', 'Malang');
-PRINT 'Stations seeded.';
+-- Seed Stations (idempotent)
+-- Inserting sample train stations...
+INSERT INTO stations (id, code, name, city)
+VALUES
+  (uuid_generate_v4(), 'GMR', 'Gambir', 'Jakarta'),
+  (uuid_generate_v4(), 'BD',  'Bandung', 'Bandung'),
+  (uuid_generate_v4(), 'YK',  'Yogyakarta', 'Yogyakarta'),
+  (uuid_generate_v4(), 'SLO', 'Solo Balapan', 'Surakarta'),
+  (uuid_generate_v4(), 'SBY', 'Surabaya Gubeng', 'Surabaya'),
+  (uuid_generate_v4(), 'MLG', 'Malang', 'Malang')
+ON CONFLICT (code) DO NOTHING;
+-- Stations seeded.
 
--- Seed Trains
-PRINT 'Inserting sample trains...';
-DECLARE @train1_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @train2_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @train3_id UNIQUEIDENTIFIER = NEWID();
+-- Seed Trains (idempotent)
+-- Inserting sample trains...
+INSERT INTO trains (id, train_number, operator)
+VALUES
+  (uuid_generate_v4(), 'ARGO-001', 'PT Kereta Api Indonesia'),
+  (uuid_generate_v4(), 'ARGO-002', 'PT Kereta Api Indonesia'),
+  (uuid_generate_v4(), 'TURANGA-101', 'PT Kereta Api Indonesia')
+ON CONFLICT (train_number) DO NOTHING;
+-- Trains seeded.
 
-IF NOT EXISTS (SELECT 1 FROM trains WHERE train_number = 'ARGO-001')
-    INSERT INTO trains (id, train_number, operator) VALUES (@train1_id, 'ARGO-001', 'PT Kereta Api Indonesia');
-IF NOT EXISTS (SELECT 1 FROM trains WHERE train_number = 'ARGO-002')
-    INSERT INTO trains (id, train_number, operator) VALUES (@train2_id, 'ARGO-002', 'PT Kereta Api Indonesia');
-IF NOT EXISTS (SELECT 1 FROM trains WHERE train_number = 'TURANGA-101')
-    INSERT INTO trains (id, train_number, operator) VALUES (@train3_id, 'TURANGA-101', 'PT Kereta Api Indonesia');
-PRINT 'Trains seeded.';
+-- Seed Train Schedules (tomorrow/day-after, idempotent)
+-- Inserting sample train schedules...
+WITH data AS (
+  SELECT *
+  FROM (VALUES
+    ('ARGO-001', 'GMR', 'BD',  1,  8, 11),
+    ('ARGO-002', 'GMR', 'YK',  1,  9, 16),
+    ('TURANGA-101', 'BD', 'YK', 2, 10, 17)
+  ) AS v(train_number, dep_station_code, arr_station_code, day_add, dep_hour, arr_hour)
+),
+resolved AS (
+  SELECT
+    t.id AS train_id,
+    ds.id AS departure_station_id,
+    asn.id AS arrival_station_id,
+    (CURRENT_DATE + (d.day_add || ' day')::interval)::date AS departure_date,
+    (CURRENT_DATE + (d.day_add || ' day')::interval + (d.dep_hour || ' hour')::interval) AS departure_time,
+    (CURRENT_DATE + (d.day_add || ' day')::interval + (d.arr_hour || ' hour')::interval) AS arrival_time
+  FROM data d
+  JOIN trains t ON t.train_number = d.train_number
+  JOIN stations ds ON ds.code = d.dep_station_code
+  JOIN stations asn ON asn.code = d.arr_station_code
+)
+INSERT INTO train_schedules (id, train_id, departure_station_id, arrival_station_id, departure_time, arrival_time, departure_date, status, created_at)
+SELECT
+  uuid_generate_v4(),
+  r.train_id,
+  r.departure_station_id,
+  r.arrival_station_id,
+  r.departure_time,
+  r.arrival_time,
+  r.departure_date,
+  'scheduled',
+  NOW()
+FROM resolved r
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM train_schedules ts
+  WHERE ts.train_id = r.train_id
+    AND ts.departure_date = r.departure_date
+);
+-- Train schedules seeded.
 
--- Get station IDs
-DECLARE @gmr_id UNIQUEIDENTIFIER = (SELECT id FROM stations WHERE code = 'GMR');
-DECLARE @bd_id UNIQUEIDENTIFIER = (SELECT id FROM stations WHERE code = 'BD');
-DECLARE @yk_id UNIQUEIDENTIFIER = (SELECT id FROM stations WHERE code = 'YK');
-DECLARE @slo_id UNIQUEIDENTIFIER = (SELECT id FROM stations WHERE code = 'SLO');
-DECLARE @sby_id UNIQUEIDENTIFIER = (SELECT id FROM stations WHERE code = 'SBY');
+-- Seed Coaches (idempotent-ish; checks by schedule+coach_number)
+-- Inserting coaches...
+WITH s1 AS (
+  SELECT ts.id AS schedule_id
+  FROM train_schedules ts
+  JOIN trains t ON t.id = ts.train_id
+  JOIN stations ds ON ds.id = ts.departure_station_id
+  JOIN stations asn ON asn.id = ts.arrival_station_id
+  WHERE t.train_number = 'ARGO-001'
+    AND ds.code = 'GMR'
+    AND asn.code = 'BD'
+    AND ts.departure_date = (CURRENT_DATE + INTERVAL '1 day')::date
+  LIMIT 1
+),
+s2 AS (
+  SELECT ts.id AS schedule_id
+  FROM train_schedules ts
+  JOIN trains t ON t.id = ts.train_id
+  JOIN stations ds ON ds.id = ts.departure_station_id
+  JOIN stations asn ON asn.id = ts.arrival_station_id
+  WHERE t.train_number = 'ARGO-002'
+    AND ds.code = 'GMR'
+    AND asn.code = 'YK'
+    AND ts.departure_date = (CURRENT_DATE + INTERVAL '1 day')::date
+  LIMIT 1
+),
+s3 AS (
+  SELECT ts.id AS schedule_id
+  FROM train_schedules ts
+  JOIN trains t ON t.id = ts.train_id
+  JOIN stations ds ON ds.id = ts.departure_station_id
+  JOIN stations asn ON asn.id = ts.arrival_station_id
+  WHERE t.train_number = 'TURANGA-101'
+    AND ds.code = 'BD'
+    AND asn.code = 'YK'
+    AND ts.departure_date = (CURRENT_DATE + INTERVAL '2 day')::date
+  LIMIT 1
+),
+coach_data AS (
+  SELECT schedule_id, coach_number, coach_type
+  FROM (
+    SELECT (SELECT schedule_id FROM s1) AS schedule_id, 'A1'::text, 'economy'::text
+    UNION ALL SELECT (SELECT schedule_id FROM s1), 'B1', 'business'
+    UNION ALL SELECT (SELECT schedule_id FROM s1), 'C1', 'executive'
+    UNION ALL SELECT (SELECT schedule_id FROM s2), 'A1', 'economy'
+    UNION ALL SELECT (SELECT schedule_id FROM s2), 'B1', 'business'
+    UNION ALL SELECT (SELECT schedule_id FROM s3), 'A1', 'economy'
+    UNION ALL SELECT (SELECT schedule_id FROM s3), 'B1', 'business'
+    UNION ALL SELECT (SELECT schedule_id FROM s3), 'C1', 'executive'
+  ) x(schedule_id, coach_number, coach_type)
+  WHERE schedule_id IS NOT NULL
+)
+INSERT INTO coaches (id, train_schedule_id, coach_number, coach_type, created_at)
+SELECT uuid_generate_v4(), cd.schedule_id, cd.coach_number, cd.coach_type, NOW()
+FROM coach_data cd
+WHERE NOT EXISTS (
+  SELECT 1 FROM coaches c
+  WHERE c.train_schedule_id = cd.schedule_id
+    AND c.coach_number = cd.coach_number
+);
+-- Coaches seeded.
 
--- Seed Train Schedules
-PRINT 'Inserting sample train schedules...';
-DECLARE @schedule1_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @schedule2_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @schedule3_id UNIQUEIDENTIFIER = NEWID();
+-- Seed Seats (idempotent-ish; checks by coach+seat_number)
+-- Inserting coach seats...
+WITH coach_limits AS (
+  SELECT
+    c.id AS coach_id,
+    c.coach_type,
+    CASE
+      WHEN c.coach_type = 'economy' THEN 40
+      WHEN c.coach_type = 'business' THEN 30
+      WHEN c.coach_type = 'executive' THEN 20
+      ELSE 0
+    END AS seat_count
+  FROM coaches c
+  JOIN train_schedules ts ON ts.id = c.train_schedule_id
+  WHERE ts.departure_date IN ((CURRENT_DATE + INTERVAL '1 day')::date, (CURRENT_DATE + INTERVAL '2 day')::date)
+),
+seats AS (
+  SELECT
+    cl.coach_id,
+    cl.coach_type AS class,
+    gs::text AS seat_number
+  FROM coach_limits cl
+  JOIN LATERAL generate_series(1, cl.seat_count) gs ON true
+  WHERE cl.seat_count > 0
+)
+INSERT INTO coach_seats (id, coach_id, seat_number, class, status, created_at)
+SELECT uuid_generate_v4(), s.coach_id, s.seat_number, s.class, 'available', NOW()
+FROM seats s
+WHERE NOT EXISTS (
+  SELECT 1 FROM coach_seats cs
+  WHERE cs.coach_id = s.coach_id
+    AND cs.seat_number = s.seat_number
+);
+-- Coach seats seeded.
 
--- Schedule 1: Jakarta to Bandung (Tomorrow)
-IF NOT EXISTS (SELECT 1 FROM train_schedules WHERE train_id = @train1_id AND departure_date = DATEADD(day, 1, CAST(GETDATE() AS DATE)))
-BEGIN
-    INSERT INTO train_schedules (id, train_id, departure_station_id, arrival_station_id, departure_time, arrival_time, departure_date, status)
-    VALUES (
-        @schedule1_id,
-        @train1_id,
-        @gmr_id,
-        @bd_id,
-        DATEADD(hour, 8, DATEADD(day, 1, CAST(GETDATE() AS DATE))), -- 08:00 tomorrow
-        DATEADD(hour, 11, DATEADD(day, 1, CAST(GETDATE() AS DATE))), -- 11:00 tomorrow
-        DATEADD(day, 1, CAST(GETDATE() AS DATE)),
-        'scheduled'
-    );
-END
-
--- Schedule 2: Jakarta to Yogyakarta (Tomorrow)
-IF NOT EXISTS (SELECT 1 FROM train_schedules WHERE train_id = @train2_id AND departure_date = DATEADD(day, 1, CAST(GETDATE() AS DATE)))
-BEGIN
-    INSERT INTO train_schedules (id, train_id, departure_station_id, arrival_station_id, departure_time, arrival_time, departure_date, status)
-    VALUES (
-        @schedule2_id,
-        @train2_id,
-        @gmr_id,
-        @yk_id,
-        DATEADD(hour, 9, DATEADD(day, 1, CAST(GETDATE() AS DATE))), -- 09:00 tomorrow
-        DATEADD(hour, 16, DATEADD(day, 1, CAST(GETDATE() AS DATE))), -- 16:00 tomorrow
-        DATEADD(day, 1, CAST(GETDATE() AS DATE)),
-        'scheduled'
-    );
-END
-
--- Schedule 3: Bandung to Yogyakarta (Day after tomorrow)
-IF NOT EXISTS (SELECT 1 FROM train_schedules WHERE train_id = @train3_id AND departure_date = DATEADD(day, 2, CAST(GETDATE() AS DATE)))
-BEGIN
-    INSERT INTO train_schedules (id, train_id, departure_station_id, arrival_station_id, departure_time, arrival_time, departure_date, status)
-    VALUES (
-        @schedule3_id,
-        @train3_id,
-        @bd_id,
-        @yk_id,
-        DATEADD(hour, 10, DATEADD(day, 2, CAST(GETDATE() AS DATE))), -- 10:00 day after tomorrow
-        DATEADD(hour, 17, DATEADD(day, 2, CAST(GETDATE() AS DATE))), -- 17:00 day after tomorrow
-        DATEADD(day, 2, CAST(GETDATE() AS DATE)),
-        'scheduled'
-    );
-END
-PRINT 'Train schedules seeded.';
-
--- Seed Coaches for Schedule 1
-PRINT 'Inserting coaches and seats for schedule 1...';
-DECLARE @coach1_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @coach2_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @coach3_id UNIQUEIDENTIFIER = NEWID();
-
-INSERT INTO coaches (id, train_schedule_id, coach_number, coach_type)
-VALUES 
-    (@coach1_id, @schedule1_id, 'A1', 'economy'),
-    (@coach2_id, @schedule1_id, 'B1', 'business'),
-    (@coach3_id, @schedule1_id, 'C1', 'executive');
-
--- Insert seats for coach 1 (economy - 40 seats)
-DECLARE @seat_num INT = 1;
-WHILE @seat_num <= 40
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach1_id, CAST(@seat_num AS VARCHAR), 'economy', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Insert seats for coach 2 (business - 30 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 30
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach2_id, CAST(@seat_num AS VARCHAR), 'business', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Insert seats for coach 3 (executive - 20 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 20
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach3_id, CAST(@seat_num AS VARCHAR), 'executive', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Seed Coaches for Schedule 2
-PRINT 'Inserting coaches and seats for schedule 2...';
-DECLARE @coach4_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @coach5_id UNIQUEIDENTIFIER = NEWID();
-
-INSERT INTO coaches (id, train_schedule_id, coach_number, coach_type)
-VALUES 
-    (@coach4_id, @schedule2_id, 'A1', 'economy'),
-    (@coach5_id, @schedule2_id, 'B1', 'business');
-
--- Insert seats for coach 4 (economy - 40 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 40
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach4_id, CAST(@seat_num AS VARCHAR), 'economy', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Insert seats for coach 5 (business - 30 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 30
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach5_id, CAST(@seat_num AS VARCHAR), 'business', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Seed Coaches for Schedule 3
-PRINT 'Inserting coaches and seats for schedule 3...';
-DECLARE @coach6_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @coach7_id UNIQUEIDENTIFIER = NEWID();
-DECLARE @coach8_id UNIQUEIDENTIFIER = NEWID();
-
-INSERT INTO coaches (id, train_schedule_id, coach_number, coach_type)
-VALUES 
-    (@coach6_id, @schedule3_id, 'A1', 'economy'),
-    (@coach7_id, @schedule3_id, 'B1', 'business'),
-    (@coach8_id, @schedule3_id, 'C1', 'executive');
-
--- Insert seats for coach 6 (economy - 40 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 40
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach6_id, CAST(@seat_num AS VARCHAR), 'economy', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Insert seats for coach 7 (business - 30 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 30
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach7_id, CAST(@seat_num AS VARCHAR), 'business', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
--- Insert seats for coach 8 (executive - 20 seats)
-SET @seat_num = 1;
-WHILE @seat_num <= 20
-BEGIN
-    INSERT INTO coach_seats (id, coach_id, seat_number, class, status)
-    VALUES (NEWID(), @coach8_id, CAST(@seat_num AS VARCHAR), 'executive', 'available');
-    SET @seat_num = @seat_num + 1;
-END
-
-PRINT '';
-PRINT 'Train data seeding complete!';
-PRINT 'Summary:';
-PRINT '  - 6 stations created';
-PRINT '  - 3 trains created';
-PRINT '  - 3 train schedules created';
-PRINT '  - 8 coaches created';
-PRINT '  - 270 seats created (90 economy, 90 business, 90 executive)';
-GO
-
-x
+-- Train data seeding complete!

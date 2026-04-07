@@ -191,7 +191,24 @@
   gap: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #e0e0e0;
+  align-items: center;
+  flex-wrap: wrap;
 }
+
+/* Inline cancel confirmation */
+.cancel-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: #5d4037;
+}
+
 
 .btn-secondary,
 .btn-danger {
@@ -223,6 +240,25 @@
 .btn-danger:hover {
   background-color: #c82333;
 }
+
+.btn-pay {
+  padding: 0.6rem 1.2rem;
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.2s;
+}
+
+.btn-pay:hover {
+  background-color: #15803d;
+}
+
 
 .btn-primary {
   display: inline-block;

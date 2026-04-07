@@ -2,14 +2,18 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { bookingAPI, Booking } from '../services/api'
+import { useToast } from '../contexts/ToastContext'
+import Skeleton from '../components/Skeleton'
 import './BookingHistory.css'
 
 const BookingHistory = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
 
   const loadBookings = useCallback(async () => {
     if (!user?.id) return
@@ -51,18 +55,43 @@ const BookingHistory = () => {
     }
   }, [user, isAuthenticated, authLoading, navigate, loadBookings])
 
-  const handleCancel = async (bookingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) {
-      return
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    const hasPendingOrInitiated = bookings.some(
+      (b) => b.status === 'pending' || b.status === 'initiated'
+    );
+
+    if (hasPendingOrInitiated && user?.id) {
+      interval = setInterval(async () => {
+        try {
+          const data = await bookingAPI.getUserBookings(user.id, { limit: 50, offset: 0 });
+          if (Array.isArray(data)) {
+            setBookings(data);
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 5000);
     }
 
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [bookings, user?.id]);
+
+  const handleCancel = async (bookingId: string) => {
+    // Show inline confirmation instead of browser confirm()
+    setCancelConfirmId(bookingId)
+  }
+
+  const handleConfirmCancel = async (bookingId: string) => {
+    setCancelConfirmId(null)
     try {
       await bookingAPI.cancelBooking(bookingId)
-      // Reload bookings
+      showToast('Booking cancelled successfully.', 'success')
       loadBookings()
     } catch (err: any) {
-      console.error('Error cancelling booking:', err)
-      alert(err.response?.data?.message || 'Failed to cancel booking')
+      showToast(err.response?.data?.message || 'Failed to cancel booking.', 'error')
     }
   }
 
@@ -101,7 +130,9 @@ const BookingHistory = () => {
   if (authLoading || loading) {
     return (
       <div className="booking-history">
-        <div className="loading">Loading bookings...</div>
+        <div className="skeleton-container" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+          <Skeleton type="card" count={3} height="200px" />
+        </div>
       </div>
     )
   }
@@ -205,12 +236,35 @@ const BookingHistory = () => {
                   View Details
                 </Link>
                 {booking.status === 'pending' && (
-                  <button
-                    onClick={() => handleCancel(booking.id)}
-                    className="btn-danger"
-                  >
-                    Cancel Booking
-                  </button>
+                  cancelConfirmId === booking.id ? (
+                    <div className="cancel-confirm">
+                      <span>Cancel this booking?</span>
+                      <button
+                        onClick={() => handleConfirmCancel(booking.id)}
+                        className="btn-danger"
+                      >
+                        Yes, Cancel
+                      </button>
+                      <button
+                        onClick={() => setCancelConfirmId(null)}
+                        className="btn-secondary"
+                      >
+                        No, Keep
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Link to={`/payment/${booking.id}`} className="btn-pay">
+                        💳 Pay Now
+                      </Link>
+                      <button
+                        onClick={() => handleCancel(booking.id)}
+                        className="btn-danger"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )
                 )}
               </div>
             </div>

@@ -2,104 +2,238 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-color); /* Light grey background outside cards */
 }
 
+/* Base Container to match the screenshot width */
 .container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 32px;
   width: 100%;
 }
 
 /* Header */
 .header {
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 1rem 0;
+  background-color: var(--bg-white);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0;
+  height: 72px; /* Fixed height header */
+  display: flex;
+  align-items: center;
 }
 
-.header-content {
+.header-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  height: 100%;
 }
 
+/* Logo */
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-decoration: none;
-  color: #333;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--blue-primary);
 }
 
 .logo h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.logo-icon {
   font-size: 1.5rem;
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 100%;
+  margin-left: 48px;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text-gray);
+  font-weight: 500;
+  font-size: 0.95rem;
+  height: 100%;
+  padding: 0 8px;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.nav-tab:hover {
+  color: var(--blue-primary);
+}
+
+.nav-tab.active {
+  color: var(--blue-primary);
+}
+
+/* Blue underline for active tab */
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--blue-primary);
+  border-radius: 3px 3px 0 0;
+}
+
+.tab-icon {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+/* Header Right - User & Utilities */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto; /* Push to right */
+}
+
+.icon-btn {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-gray);
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: var(--bg-color);
+  color: var(--blue-primary);
+}
+
+/* Profile Dropdown */
+.user-dropdown {
+  position: relative;
+}
+
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px 6px 6px;
+  background-color: var(--bg-color);
+  border: none;
+  border-radius: 20px;
+  text-decoration: none;
+  color: var(--text-dark);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.profile-btn:hover {
+  background-color: #e5e7eb;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--blue-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 600;
 }
 
-.nav {
+.chevron {
+  color: var(--text-gray);
+  font-size: 1.2rem;
+  line-height: 0.5;
+  margin-top: -4px;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 180px;
+  display: none;
+  flex-direction: column;
+  z-index: 100;
+  padding: 8px 0;
+}
+
+.user-dropdown:hover .dropdown-menu {
   display: flex;
-  align-items: center;
-  gap: 1.5rem;
 }
 
-.nav a {
+.dropdown-menu a, .dropdown-menu button {
+  padding: 10px 16px;
   text-decoration: none;
-  color: #333;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.nav a:hover {
-  color: #007bff;
-}
-
-.user-info {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.btn-primary:hover {
-  background-color: #0056b3;
-}
-
-.btn-logout {
-  background-color: #dc3545;
-  color: white;
-  padding: 0.5rem 1rem;
+  color: var(--text-dark);
+  font-size: 0.95rem;
+  background: none;
   border: none;
-  border-radius: 4px;
+  text-align: left;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
+  width: 100%;
 }
 
-.btn-logout:hover {
-  background-color: #c82333;
+.dropdown-menu a:hover, .dropdown-menu button:hover {
+  background-color: var(--bg-color);
+  color: var(--blue-primary);
+}
+
+.admin-link {
+  color: var(--orange-warning) !important;
+}
+
+/* Auth Buttons */
+.auth-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-login {
+  color: var(--text-dark);
+  padding: 8px 16px;
+  font-weight: 500;
+}
+
+.btn-register {
+  background-color: var(--blue-primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-register:hover {
+  background-color: var(--blue-hover);
 }
 
 /* Main */
 .main {
   flex: 1;
-  padding: 2rem 0;
+  padding: 24px 0; /* Add top padding to the content below header */
 }
-
-/* Footer */
-.footer {
-  background-color: #333;
-  color: #fff;
-  padding: 1.5rem 0;
-  margin-top: auto;
-}
-
-.footer p {
-  text-align: center;
-  font-size: 0.9rem;
-}
-

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { hotelAPI, Hotel } from '../services/api'
+import Skeleton from '../components/Skeleton'
 import './Hotels.css'
 
 const PAGE_SIZE = 6
@@ -36,14 +37,9 @@ const Hotels = () => {
         size: PAGE_SIZE,
       })
 
-      // Handle both array response (search) and paginated response
       if (Array.isArray(response)) {
         setHotels(response)
-        setPageMeta({
-          page: 0,
-          totalPages: 1,
-          totalElements: response.length,
-        })
+        setPageMeta({ page: 0, totalPages: 1, totalElements: response.length })
       } else {
         setHotels(response.content || [])
         setPageMeta({
@@ -54,9 +50,7 @@ const Hotels = () => {
       }
       setSearchMode(false)
     } catch (err: any) {
-      console.error('Error loading hotels:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load hotels'
-      setError(errorMessage)
+      setError(err.response?.data?.message || err.message || 'Failed to load hotels')
       setHotels([])
     } finally {
       setLoading(false)
@@ -71,7 +65,6 @@ const Hotels = () => {
       setError('Please provide a city name')
       return
     }
-
     if (searchParams.checkin >= searchParams.checkout) {
       setError('Check-out date must be after check-in date')
       return
@@ -79,20 +72,11 @@ const Hotels = () => {
 
     setSearchLoading(true)
     try {
-      const result = await hotelAPI.searchHotels({
-        city: searchParams.city,
-        checkin: searchParams.checkin,
-        checkout: searchParams.checkout,
-        guests: searchParams.guests,
-      })
+      const result = await hotelAPI.searchHotels(searchParams)
 
       if (Array.isArray(result)) {
         setHotels(result)
-        setPageMeta({
-          page: 0,
-          totalPages: 1,
-          totalElements: result.length,
-        })
+        setPageMeta({ page: 0, totalPages: 1, totalElements: result.length })
       } else {
         setHotels(result.content || [])
         setPageMeta({
@@ -116,186 +100,278 @@ const Hotels = () => {
 
   const handleReset = () => {
     setSearchMode(false)
-    setSearchParams((prev) => ({
-      ...prev,
-      city: '',
-    }))
+    setSearchParams(prev => ({ ...prev, city: '' }))
     setError('')
-    // setSelectedHotelRooms({})
     loadHotels(0)
   }
 
-  const handlePageChange = (newPage: number) => {
-    if (searchMode || newPage < 0 || newPage >= pageMeta.totalPages) return
-    loadHotels(newPage)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchParams((prev) => ({
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setSearchParams(prev => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [e.target.name]: e.target.name === 'guests' ? parseInt(e.target.value, 10) : e.target.value,
     }))
   }
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSearchParams((prev) => ({
-      ...prev,
-      [e.target.name]: parseInt(e.target.value, 10),
-    }))
-  }
-
+  const baseDate = new Date(searchParams.checkin)
+  const dateCarousel = Array.from({length: 6}).map((_, i) => {
+    const d = new Date(baseDate)
+    d.setDate(d.getDate() + i)
+    return {
+      iso: d.toISOString().split('T')[0],
+      dateStr: `${d.getDate()} ${d.toLocaleString?.('default', { month: 'short' }) ?? ''}`,
+      dayStr: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
+    }
+  })
 
   return (
-    <div className="hotels">
-      <div className="hotels-header">
-        <h1>Hotels</h1>
-        <p>Browse available hotels or search by city, check-in, and check-out dates.</p>
-      </div>
-
-      <form className="hotels-form" onSubmit={handleSearch}>
-        <div className="form-grid">
-          <div className="form-group">
-            <label htmlFor="city">City</label>
-            <input
-              type="text"
-              id="city"
-              name="city"
-              value={searchParams.city}
-              onChange={handleInputChange}
-              placeholder="e.g., Jakarta, Bandung, Bali"
-            />
+    <div className="hotels-page container">
+      {/* 1. Header Search Bar Area */}
+      <section className="search-banner">
+        <form className="search-bar" onSubmit={handleSearch}>
+          <div className="search-field" style={{ flex: 1.5 }}>
+            <label>City, Destination, or Hotel Name</label>
+            <div className="input-with-icon">
+              <span>🏙️</span>
+              <input
+                type="text"
+                name="city"
+                value={searchParams.city}
+                onChange={handleInputChange}
+                placeholder="e.g., Jakarta, Bali"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="checkin">Check-in Date</label>
-            <input
-              type="date"
-              id="checkin"
-              name="checkin"
-              value={searchParams.checkin}
-              onChange={handleInputChange}
-              required
-            />
+          <div className="search-divider"></div>
+
+          <div className="search-field">
+            <label>Check-in</label>
+            <div className="input-with-icon">
+              <span>📅</span>
+              <input
+                type="date"
+                name="checkin"
+                value={searchParams.checkin}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="checkout">Check-out Date</label>
-            <input
-              type="date"
-              id="checkout"
-              name="checkout"
-              value={searchParams.checkout}
-              onChange={handleInputChange}
-              required
-            />
+          <div className="search-field">
+            <label>Check-out</label>
+            <div className="input-with-icon">
+              <span>📅</span>
+              <input
+                type="date"
+                name="checkout"
+                value={searchParams.checkout}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="guests">Guests</label>
-            <select
-              id="guests"
-              name="guests"
-              value={searchParams.guests}
-              onChange={handleSelectChange}
-            >
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <option key={num} value={num}>
-                  {num} {num === 1 ? 'Guest' : 'Guests'}
-                </option>
-              ))}
-            </select>
+          <div className="search-field">
+            <label>Guests & Rooms</label>
+            <div className="input-with-icon">
+              <span>👥</span>
+              <select name="guests" value={searchParams.guests} onChange={handleInputChange}>
+                {[1, 2, 3, 4, 5, 6].map(num => (
+                  <option key={num} value={num}>{num} Guest{num > 1 ? 's' : ''}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div className="form-actions">
-          <button className="btn-search" type="submit" disabled={searchLoading}>
-            {searchLoading ? 'Searching...' : 'Search Hotels'}
+          <button className="btn-search-primary" type="submit" disabled={searchLoading}>
+            {searchLoading ? '...' : 'Search Hotel'}
           </button>
-          {searchMode && (
-            <button type="button" className="btn-reset" onClick={handleReset}>
-              Reset Search
-            </button>
-          )}
-        </div>
-      </form>
+        </form>
+      </section>
 
       {error && (
-        <div className="error-message" role="alert">
-          {error}
+        <div className="alert-error" style={{marginTop: '24px'}}>
+          <span className="alert-icon">⚠️</span>
+          <p>{error}</p>
         </div>
       )}
 
-      <div className="hotels-results">
-        {loading && <p>Loading hotels...</p>}
+      {/* 2. Main Layout */}
+      <section className="main-content-grid" style={{marginTop: error ? '16px' : '24px'}}>
+        
+        {/* Left Col: Filters */}
+        <aside className="filters-sidebar">
+          <div className="filter-header">
+            <h3>Filter</h3>
+            <button className="btn-reset-filters" type="button" onClick={() => loadHotels(0)}>Reset</button>
+          </div>
 
-        {!loading && hotels.length === 0 && !error && (
-          <p>{searchMode ? 'No hotels matched your search.' : 'No hotels available.'}</p>
-        )}
+          <div className="filter-group">
+            <h4>Price Range <span className="chevron">⌄</span></h4>
+            <div className="price-inputs">
+              <input type="text" placeholder="IDR 0" value="IDR 500.000" readOnly/>
+              <input type="text" placeholder="IDR max" value="IDR 10.000.000" readOnly/>
+            </div>
+          </div>
 
-        {hotels.map((hotel) => {
-          // Defensive: some backends might return Id/ID instead of id
-          const hotelId = (hotel as any).id ?? (hotel as any).ID ?? (hotel as any).Id
-          return (
-          <div className="hotel-card" key={hotelId}>
-            <div className="hotel-card__header">
-              <div>
-                <h2>{hotel.name}</h2>
-                <p className="hotel-location">
-                  {hotel.city} {hotel.address && `• ${hotel.address}`}
-                </p>
-                {hotel.rating && (
-                  <p className="hotel-rating">
-                    ⭐ {hotel.rating.toFixed(1)}
-                  </p>
-                )}
+          <div className="filter-group">
+            <h4>Star Rating <span className="chevron">⌄</span></h4>
+            <label className="checkbox-label"><span>5 Stars ⭐⭐⭐⭐⭐</span> <input type="checkbox" defaultChecked /></label>
+            <label className="checkbox-label"><span>4 Stars ⭐⭐⭐⭐</span> <input type="checkbox" defaultChecked /></label>
+            <label className="checkbox-label"><span>3 Stars ⭐⭐⭐</span> <input type="checkbox" /></label>
+            <label className="checkbox-label"><span>1-2 Stars ⭐⭐</span> <input type="checkbox" /></label>
+          </div>
+
+          <div className="filter-group">
+            <h4>Facilities <span className="chevron">⌄</span></h4>
+            <label className="checkbox-label"><span>Swimming Pool</span> <input type="checkbox" defaultChecked/></label>
+            <label className="checkbox-label"><span>WiFi</span> <input type="checkbox" defaultChecked/></label>
+            <label className="checkbox-label"><span>Gym</span> <input type="checkbox" /></label>
+            <label className="checkbox-label"><span>Restaurant</span> <input type="checkbox" /></label>
+          </div>
+
+          <div className="filter-group">
+            <h4>Property Type <span className="chevron">⌄</span></h4>
+            <label className="checkbox-label"><span>Hotel</span> <input type="checkbox" defaultChecked/></label>
+            <label className="checkbox-label"><span>Villa & Resort</span> <input type="checkbox" /></label>
+            <label className="checkbox-label"><span>Apartment</span> <input type="checkbox" /></label>
+          </div>
+        </aside>
+
+        {/* Mid Col: Results */}
+        <div className="results-container">
+          <div className="results-header">
+            <div>
+              <h2 style={{fontSize: '1.25rem', marginBottom: '4px'}}>Available Properties <span style={{fontSize: '0.9rem', color: '#9ca3af', fontWeight: 400}}>( The best stays at the best prices )</span></h2>
+            </div>
+            <div className="results-actions">
+              <span className="sort-text">Sort =</span>
+              <span className="view-toggle">
+                <span className="icon">㗊</span>
+                <span className="icon active">≣</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="date-carousel">
+            <button className="nav-btn">&lt;</button>
+            {dateCarousel.map((d, i) => (
+              <div key={i} className={`date-tab ${i === 0 ? 'active' : ''}`} onClick={() => setSearchParams(p => ({...p, checkin: d.iso}))}>
+                <span className="date">{d.dateStr}</span>
+                <span className="day">{d.dayStr}</span>
+              </div>
+            ))}
+            <button className="nav-btn">&gt;</button>
+          </div>
+
+          {loading ? (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+              <Skeleton type="card" count={3} height="240px" />
+            </div>
+          ) : hotels.length === 0 ? (
+            <div style={{padding: '24px', textAlign: 'center'}}>No hotels available.</div>
+          ) : null}
+
+          <div className="hotel-list">
+            {hotels.map(hotel => {
+              const hotelId = (hotel as any).id ?? (hotel as any).ID ?? (hotel as any).Id
+              return (
+                <div className="hotel-row-card" key={hotelId}>
+                  {/* Mock image container */}
+                  <div className="hotel-image">
+                    <span className="mock-img-icon">🏠</span>
+                  </div>
+
+                  <div className="hotel-content">
+                    <div className="row-card-top">
+                      <div className="route-info">
+                        <span className="origin">{hotel.name}</span>
+                      </div>
+                      <div className="rating">
+                        <span className="star">★</span> {hotel.rating != null ? hotel.rating.toFixed(1) : '4.5'} <span className="bookmark">🔖</span>
+                      </div>
+                    </div>
+                    
+                    <div className="hotel-class-label">
+                      📍 {hotel.city} {hotel.address && `• ${hotel.address}`}
+                    </div>
+
+                    <div className="room-types-row">
+                      {hotel.roomTypes && hotel.roomTypes.length > 0 ? (
+                        <div className="room-badges">
+                          {hotel.roomTypes.slice(0, 2).map((rt) => (
+                            <span key={rt.id} className="room-badge">{rt.name} (Max: {rt.capacity})</span>
+                          ))}
+                          {hotel.roomTypes.length > 2 && <span className="room-badge">+{hotel.roomTypes.length - 2} more</span>}
+                        </div>
+                      ) : (
+                        <span className="room-badge">Standard Rooms</span>
+                      )}
+                    </div>
+
+                    <div className="row-card-bottom">
+                      <div className="facilities">
+                        <p>Facilities</p>
+                        <div className="tags">
+                          <span>📶 WiFi</span>
+                          <span>🏊 Pool</span>
+                          <span>🍳 Breakfast</span>
+                        </div>
+                      </div>
+                      <div className="price-action">
+                        {/* Mock Price for layout */}
+                        <div className="price-text">Starting from <br/><span>IDR {(Math.random() * 500000 + 300000).toFixed(0)}</span> / Night</div>
+                        <Link to={hotelId ? `/hotels/${hotelId}` : '#'} className="btn-buy-now" style={{display: 'inline-block', textAlign: 'center', textDecoration: 'none'}}>
+                          Select Room
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Right Col: Promos */}
+        <aside className="right-sidebar">
+          <div className="widget-card discounts-widget">
+            <div className="widget-header">
+              <h3>🎫 Special Offers</h3>
+              <a href="#">See all</a>
+            </div>
+            
+            <div className="promo-card">
+              <div className="promo-top">
+                <div className="promo-icon" style={{background: '#10b981'}}>🏖️</div>
+                <div>
+                  <h4>Bali Getaway Discount 30%</h4>
+                  <p>Valid for minimum 3 nights stay</p>
+                </div>
+              </div>
+              <div className="promo-code-box">
+                BALI-VIBES-30 <span>📋</span>
               </div>
             </div>
 
-            <div className="hotel-info">
-              {hotel.roomTypes && hotel.roomTypes.length > 0 && (
-                <div className="room-types">
-                  <p className="label">Room Types Available</p>
-                  <div className="room-type-grid">
-                    {hotel.roomTypes.map((rt) => (
-                      <div className="room-type-card" key={rt.id}>
-                        <p className="room-type-name">{rt.name}</p>
-                        <p className="room-type-capacity">Capacity: {rt.capacity} guests</p>
-                      </div>
-                    ))}
-                  </div>
+            <div className="promo-card">
+              <div className="promo-top">
+                <div className="promo-icon" style={{background: '#3b82f6'}}>💳</div>
+                <div>
+                  <h4>Bank Partner Cashback 15%</h4>
+                  <p>Pay with selected credit cards</p>
                 </div>
-              )}
-
-              <Link
-                to={hotelId ? `/hotels/${hotelId}` : '#'}
-                className="btn-view-rooms"
-              >
-                View Available Rooms →
-              </Link>
+              </div>
+              <div className="promo-code-box">
+                CC-STAY-15 <span>📋</span>
+              </div>
             </div>
           </div>
-        )})}
-
-        {!searchMode && pageMeta.totalPages > 1 && (
-          <div className="pagination">
-            <button onClick={() => handlePageChange(pageMeta.page - 1)} disabled={pageMeta.page === 0}>
-              Previous
-            </button>
-            <span>
-              Page {pageMeta.page + 1} of {pageMeta.totalPages}
-            </span>
-            <button
-              onClick={() => handlePageChange(pageMeta.page + 1)}
-              disabled={pageMeta.page + 1 >= pageMeta.totalPages}
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </div>
+        </aside>
+      </section>
     </div>
   )
 }
 
 export default Hotels
-

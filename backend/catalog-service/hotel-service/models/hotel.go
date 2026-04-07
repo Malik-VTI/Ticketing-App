@@ -174,6 +174,18 @@ type HotelSearchRequest struct {
 	Direction string `form:"direction"`
 }
 
+// Reserve rooms request
+type ReserveRoomsRequest struct {
+	RoomTypeID uuid.UUID `json:"room_type_id" binding:"required"`
+	CheckIn    string    `json:"check_in" binding:"required"`
+	CheckOut   string    `json:"check_out" binding:"required"`
+	Quantity   int       `json:"quantity" binding:"required,min=1"`
+}
+
+type ReserveRoomsResponse struct {
+	RoomNumbers []string `json:"room_numbers"`
+}
+
 // Error response
 type ErrorResponse struct {
 	Error   string `json:"error"`

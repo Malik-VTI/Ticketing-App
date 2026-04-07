@@ -58,6 +58,24 @@ public class TrainService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public void reserveSeats(UUID scheduleId, List<String> seatNumbers) {
+        List<CoachSeat> seats = seatRepository.findByScheduleIdAndSeatNumberIn(scheduleId, seatNumbers);
+        
+        if (seats.size() != seatNumbers.size()) {
+            throw new ResourceNotFoundException("Some seats in " + seatNumbers + " not found for schedule " + scheduleId);
+        }
+
+        for (CoachSeat seat : seats) {
+            if (!"available".equals(seat.getStatus())) {
+                throw new IllegalStateException("Seat " + seat.getSeatNumber() + " is already " + seat.getStatus());
+            }
+            seat.setStatus("booked");
+        }
+        
+        seatRepository.saveAll(seats);
+    }
+
     private TrainScheduleDTO convertToDTO(TrainSchedule schedule) {
         TrainScheduleDTO dto = new TrainScheduleDTO();
         Train train = schedule.getTrain();
@@ -86,7 +104,7 @@ public class TrainService {
                 .entrySet().stream()
                 .map(entry -> {
                     long available = entry.getValue().stream()
-                            .filter(s -> "available".equals(s.getStatus()))
+                            .filter(s -> "available".equalsIgnoreCase(s.getStatus()))
                             .count();
                     return new SeatInfo(
                             entry.getKey(),

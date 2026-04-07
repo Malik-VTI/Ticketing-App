@@ -43,6 +43,7 @@ func SetupRoutes(
 		public.GET("/:id", hotelHandler.GetHotelByID)
 		public.GET("/:id/rooms", hotelHandler.GetRooms)
 		public.GET("/:id/rates", hotelHandler.GetRates)
+		public.POST("/:id/reserve", hotelHandler.ReserveRooms)
 	}
 
 	// Admin routes

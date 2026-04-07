@@ -4,13 +4,13 @@
 
 -- Create users table
 CREATE TABLE users (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(512) NOT NULL,
-    full_name NVARCHAR(255),
+    full_name VARCHAR(255),
     phone VARCHAR(50),
-    created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    updated_at DATETIME2
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
 );
 
 -- Create index on email for fast lookups

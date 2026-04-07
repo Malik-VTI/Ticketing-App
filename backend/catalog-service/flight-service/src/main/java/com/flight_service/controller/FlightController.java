@@ -2,13 +2,17 @@ package com.flight_service.controller;
 
 import com.flight_service.dto.FlightScheduleDTO;
 import com.flight_service.dto.FlightSeatDTO;
+import com.flight_service.dto.request.ReserveSeatsRequest;
+import com.flight_service.exception.ResourceNotFoundException;
 import com.flight_service.service.FlightService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +49,16 @@ public class FlightController {
         return ResponseEntity.ok(schedules);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<FlightScheduleDTO>> searchByNames(
+            @RequestParam String originName,
+            @RequestParam String destinationName,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<FlightScheduleDTO> result = flightService.searchByAirportNames(
+                originName, destinationName, date);
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/schedules/{id}")
     public ResponseEntity<FlightScheduleDTO> getScheduleById(@PathVariable UUID id) {
         FlightScheduleDTO schedule = flightService.getScheduleById(id);
@@ -61,6 +75,18 @@ public class FlightController {
     public ResponseEntity<List<FlightSeatDTO>> getAvailableSeatsBySchedule(@PathVariable UUID id) {
         List<FlightSeatDTO> seats = flightService.getAvailableSeatsBySchedule(id);
         return ResponseEntity.ok(seats);
+    }
+
+    @PostMapping("/schedules/{id}/reserve")
+    public ResponseEntity<?> reserveSeats(@PathVariable UUID id, @Valid @RequestBody ReserveSeatsRequest request) {
+        try {
+            flightService.reserveSeats(id, request.getSeatNumbers());
+            return ResponseEntity.ok().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 
     @GetMapping("/health")

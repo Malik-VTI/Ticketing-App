@@ -1,5 +1,5 @@
-# PowerShell Script to Run All Migrations
-# Usage: .\run_migrations.ps1 -Server "localhost" -Database "ticketing_db" -User "sa" -Password "YourPassword"
+# PowerShell Script to Run All Migrations (PostgreSQL)
+# Usage: .\run_migrations.ps1 -Server "localhost" -Database "ticketing_app" -User "postgres" -Password "YourPassword"
 
 param(
     [Parameter(Mandatory=$true)]
@@ -9,13 +9,13 @@ param(
     [string]$Database,
     
     [Parameter(Mandatory=$false)]
-    [string]$User = "sa",
+    [string]$User = "postgres",
     
     [Parameter(Mandatory=$false)]
     [string]$Password,
     
     [Parameter(Mandatory=$false)]
-    [switch]$TrustServerCertificate = $true
+    [int]$Port = 5432
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,34 +32,17 @@ Write-Host "Database: $Database" -ForegroundColor Yellow
 Write-Host "Migrations Path: $migrationsPath" -ForegroundColor Yellow
 Write-Host ""
 
-# Check if sqlcmd is available
+# Check if psql is available
 try {
-    $sqlcmdVersion = sqlcmd -? 2>&1 | Select-String "Version"
-    if (-not $sqlcmdVersion) {
-        throw "sqlcmd not found"
-    }
+    $psqlVersion = psql --version 2>&1
+    if (-not $psqlVersion) { throw "psql not found" }
 } catch {
-    Write-Host "ERROR: sqlcmd is not available. Please install SQL Server Command Line Utilities." -ForegroundColor Red
-    Write-Host "Download from: https://docs.microsoft.com/en-us/sql/tools/sqlcmd-utility" -ForegroundColor Yellow
+    Write-Host "ERROR: psql is not available. Please install PostgreSQL client tools." -ForegroundColor Red
     exit 1
 }
 
-# Build connection string
-$connectionString = "-S `"$Server`" -d `"$Database`""
-if ($User) {
-    $connectionString += " -U `"$User`""
-    if ($Password) {
-        $connectionString += " -P `"$Password`""
-    } else {
-        Write-Host "Password not provided. You will be prompted for password." -ForegroundColor Yellow
-    }
-} else {
-    $connectionString += " -E" # Use Windows Authentication
-}
-
-if ($TrustServerCertificate) {
-    $connectionString += " -C"
-}
+# Build connection args
+$connectionArgs = @("-h", $Server, "-p", "$Port", "-U", $User, "-d", $Database)
 
 # Get all migration files in order
 $migrationFiles = Get-ChildItem -Path $migrationsPath -Filter "V*.sql" | Sort-Object Name
@@ -83,8 +66,8 @@ foreach ($file in $migrationFiles) {
     Write-Host "Running: $($file.Name)..." -ForegroundColor Cyan
     
     try {
-        $command = "sqlcmd $connectionString -i `"$($file.FullName)`""
-        Invoke-Expression $command
+        $env:PGPASSWORD = $Password
+        & psql @connectionArgs -v ON_ERROR_STOP=1 -f $file.FullName
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  ✓ Success" -ForegroundColor Green
@@ -112,7 +95,7 @@ Write-Host ""
 
 if ($failCount -eq 0) {
     Write-Host "All migrations completed successfully!" -ForegroundColor Green
-    Write-Host "You can now verify the setup by running: .\verify_setup.sql" -ForegroundColor Yellow
+    Write-Host "You can now verify the setup by running: psql -h $Server -p $Port -U $User -d $Database -f verify_setup.sql" -ForegroundColor Yellow
 } else {
     Write-Host "Some migrations failed. Please check the errors above." -ForegroundColor Red
     exit 1

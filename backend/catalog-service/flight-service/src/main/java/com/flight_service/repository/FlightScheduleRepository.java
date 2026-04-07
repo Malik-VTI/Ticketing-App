@@ -1,6 +1,8 @@
 package com.flight_service.repository;
 
 import com.flight_service.entity.FlightSchedule;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -25,5 +27,25 @@ public interface FlightScheduleRepository extends JpaRepository<FlightSchedule, 
     List<FlightSchedule> findByRouteAndDate(@Param("originId") UUID originId, 
                                             @Param("destinationId") UUID destinationId, 
                                             @Param("date") LocalDate date);
+
+    @Query("SELECT fs FROM FlightSchedule fs " +
+            "JOIN FETCH fs.flight f " +
+            "JOIN FETCH f.airline " +
+            "JOIN FETCH f.originAirport " +
+            "JOIN FETCH f.destinationAirport")
+    Page<FlightSchedule> findAllWithDetails(Pageable pageable);
+
+    @Query("SELECT fs FROM FlightSchedule fs " +
+            "JOIN FETCH fs.flight f " +
+            "JOIN FETCH f.airline " +
+            "JOIN FETCH f.originAirport oa " +
+            "JOIN FETCH f.destinationAirport da " +
+            "WHERE LOWER(oa.name) LIKE LOWER(CONCAT('%', :originName, '%')) " +
+            "AND LOWER(da.name) LIKE LOWER(CONCAT('%', :destinationName, '%')) " +
+            "AND fs.departureDate = :date")
+    List<FlightSchedule> findByAirportNamesAndDate(
+            @Param("originName") String originName,
+            @Param("destinationName") String destinationName,
+            @Param("date") LocalDate date);
 }
 

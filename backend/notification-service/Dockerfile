@@ -1,28 +1,24 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Copy pom.xml
-COPY pom.xml .
+COPY go.* ./
+RUN go mod download
 
-# Download dependencies
-RUN mvn dependency:go-offline -B
+COPY . .
 
-# Copy source code
-COPY src ./src
-
-# Build the application
-RUN mvn clean package -DskipTests
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/api
 
 # Production stage
-FROM eclipse-temurin:17-jre-alpine
+FROM alpine:latest
 
-WORKDIR /app
+RUN apk --no-cache add ca-certificates
 
-# Copy the jar from builder
-COPY --from=builder /app/target/*.jar app.jar
+WORKDIR /root/
+
+COPY --from=builder /app/main .
 
 EXPOSE 8087
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["./main"]

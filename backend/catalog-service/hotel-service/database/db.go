@@ -5,24 +5,25 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/denisenkom/go-mssqldb"
 	"hotel-service/config"
+
+	_ "github.com/lib/pq"
 )
 
 var DB *sql.DB
 
 func InitDB(cfg *config.Config) error {
 	connectionString := fmt.Sprintf(
-		"server=%s;user id=%s;password=%s;database=%s;port=%d;encrypt=disable;TrustServerCertificate=true",
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Database.Server,
+		cfg.Database.Port,
 		cfg.Database.UserID,
 		cfg.Database.Password,
 		cfg.Database.Database,
-		cfg.Database.Port,
 	)
 
 	var err error
-	DB, err = sql.Open("sqlserver", connectionString)
+	DB, err = sql.Open("postgres", connectionString)
 	if err != nil {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
@@ -45,4 +46,3 @@ func CloseDB() error {
 	}
 	return nil
 }
-

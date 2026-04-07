@@ -4,29 +4,29 @@
 
 -- Create bookings table
 CREATE TABLE bookings (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    user_id UNIQUEIDENTIFIER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
     booking_reference VARCHAR(50) UNIQUE NOT NULL,
     booking_type VARCHAR(20) NOT NULL, -- flight, train, hotel
     total_amount DECIMAL(18,2) NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'IDR',
     status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, confirmed, cancelled, expired
-    created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    updated_at DATETIME2,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
     CONSTRAINT FK_booking_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Create booking_items table
 CREATE TABLE booking_items (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    booking_id UNIQUEIDENTIFIER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL,
     item_type VARCHAR(20) NOT NULL, -- flight, train, hotel
-    item_ref_id UNIQUEIDENTIFIER NOT NULL, -- references flight_schedule.id / train_schedule.id / room_rate.id
+    item_ref_id UUID NOT NULL, -- references flight_schedule.id / train_schedule.id / room_rate.id
     price DECIMAL(18,2) NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
-    metadata NVARCHAR(MAX), -- JSON string for seat numbers, room numbers, etc.
-    created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    updated_at DATETIME2,
+    metadata JSONB, -- JSON for seat numbers, room numbers, etc.
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
     CONSTRAINT FK_booking_item_booking FOREIGN KEY (booking_id) REFERENCES bookings(id)
 );
 

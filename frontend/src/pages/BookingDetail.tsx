@@ -2,15 +2,19 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { bookingAPI, Booking } from '../services/api'
+import { useToast } from '../contexts/ToastContext'
+import Skeleton from '../components/Skeleton'
 import './BookingDetail.css'
 
 const BookingDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const { isAuthenticated, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
   const [booking, setBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   const loadBooking = useCallback(async () => {
     if (!id) return
@@ -45,20 +49,40 @@ const BookingDetail = () => {
     }
   }, [id, isAuthenticated, authLoading, navigate, loadBooking])
 
-  const handleCancel = async () => {
-    if (!booking) return
-
-    if (!confirm('Are you sure you want to cancel this booking?')) {
-      return
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (booking?.status === 'pending' || booking?.status === 'initiated') {
+      interval = setInterval(async () => {
+        if (!id) return;
+        try {
+          const data = await bookingAPI.getBookingById(id);
+          setBooking(data);
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 5000);
     }
 
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [booking?.status, id]);
+
+  const handleCancel = () => {
+    if (!booking) return
+    setShowCancelConfirm(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!booking) return
+    setShowCancelConfirm(false)
     try {
       await bookingAPI.cancelBooking(booking.id)
-      // Reload booking
+      showToast('Booking cancelled successfully.', 'success')
       loadBooking()
     } catch (err: any) {
-      console.error('Error cancelling booking:', err)
-      alert(err.response?.data?.message || 'Failed to cancel booking')
+      showToast(err.response?.data?.message || 'Failed to cancel booking.', 'error')
     }
   }
 
@@ -97,7 +121,11 @@ const BookingDetail = () => {
   if (authLoading || loading) {
     return (
       <div className="booking-detail">
-        <div className="loading">Loading booking details...</div>
+        <div className="skeleton-container" style={{ padding: '2rem' }}>
+          <Skeleton type="title" width="30%" />
+          <Skeleton type="card" height="300px" />
+          <Skeleton type="card" height="200px" />
+        </div>
       </div>
     )
   }
@@ -233,9 +261,23 @@ const BookingDetail = () => {
 
         <div className="booking-actions-section">
           {booking.status === 'pending' && (
-            <button onClick={handleCancel} className="btn-danger-large">
-              Cancel Booking
-            </button>
+            showCancelConfirm ? (
+              <div className="cancel-confirm-inline">
+                <p>Are you sure you want to cancel this booking?</p>
+                <div className="cancel-confirm-buttons">
+                  <button onClick={handleConfirmCancel} className="btn-danger-large">
+                    Yes, Cancel Booking
+                  </button>
+                  <button onClick={() => setShowCancelConfirm(false)} className="btn-secondary-large">
+                    No, Keep It
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={handleCancel} className="btn-danger-large">
+                Cancel Booking
+              </button>
+            )
           )}
         </div>
       </div>
