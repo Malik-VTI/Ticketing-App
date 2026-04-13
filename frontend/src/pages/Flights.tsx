@@ -24,8 +24,8 @@ const Flights = () => {
   const [loading, setLoading] = useState(true)
   const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
-  const [searchMode, setSearchMode] = useState(false)
-  const [pageMeta, setPageMeta] = useState({
+  const [_searchMode, setSearchMode] = useState(false)
+  const [_pageMeta, setPageMeta] = useState({
     page: 0,
     totalPages: 0,
     totalElements: 0,

@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './Layout.css'
 
@@ -11,9 +11,6 @@ const Layout = () => {
     logout()
     navigate('/')
   }
-
-  // Helper to determine if a route is active
-  const isActive = (path: string) => location.pathname.startsWith(path)
 
   return (
     <div className="layout">

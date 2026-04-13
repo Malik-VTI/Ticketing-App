@@ -24,8 +24,8 @@ const Trains = () => {
   const [loading, setLoading] = useState(true)
   const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
-  const [searchMode, setSearchMode] = useState(false)
-  const [pageMeta, setPageMeta] = useState({
+  const [_searchMode, setSearchMode] = useState(false)
+  const [_pageMeta, setPageMeta] = useState({
     page: 0,
     totalPages: 0,
     totalElements: 0,
@@ -194,7 +194,7 @@ const Trains = () => {
     return `${hours}h ${minutes}m`
   }
 
-  const getDayAndDateStr = (dateStr: string) => {
+  const _getDayAndDateStr = (dateStr: string) => {
     const d = new Date(dateStr)
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     return {
