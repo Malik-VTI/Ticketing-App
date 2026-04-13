@@ -94,8 +94,8 @@ metadata:
   name: ${jobName}
   namespace: ${env.KANIKO_NAMESPACE}
 spec:
-  ttlSecondsAfterFinished: 300
   backoffLimit: 1
+  activeDeadlineSeconds: 7200
   template:
     spec:
       restartPolicy: Never
@@ -106,6 +106,7 @@ spec:
             - "--dockerfile=${svc.dockerfile}"
             - "--context=${kanikoContext}"
             - "--destination=${dest}"
+            - "--verbosity=info"
           env:
             - name: DOCKER_CONFIG
               value: /kaniko/.docker
@@ -113,6 +114,13 @@ spec:
             - secretRef:
                 name: kaniko-git-credentials
                 optional: true
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 6Gi
+              cpu: "2"
           volumeMounts:
             - name: docker-config
               mountPath: /kaniko/.docker
@@ -128,8 +136,25 @@ spec:
                                 export KUBECONFIG="\${KUBECONFIG_PATH}"
                                 export PATH="\${WORKSPACE}/bin:\${PATH}"
                                 kubectl apply -f kaniko-job.yaml
-                                kubectl wait --for=condition=complete job/${jobName} -n ${env.KANIKO_NAMESPACE} --timeout=45m \\
-                                    || { kubectl logs job/${jobName} -n ${env.KANIKO_NAMESPACE} --all-containers; exit 1; }
+                                set +e
+                                kubectl wait --for=condition=complete job/${jobName} -n ${env.KANIKO_NAMESPACE} --timeout=45m
+                                WAIT_RC=\$?
+                                set -e
+                                if [ "\$WAIT_RC" -ne 0 ]; then
+                                  echo "=== kubectl describe job/${jobName} ==="
+                                  kubectl describe job/${jobName} -n ${env.KANIKO_NAMESPACE} 2>/dev/null || true
+                                  echo "=== pods (job-name=${jobName}) ==="
+                                  kubectl get pods -n ${env.KANIKO_NAMESPACE} -l job-name=${jobName} -o wide 2>/dev/null || true
+                                  echo "=== kaniko container logs (by pod) ==="
+                                  for POD in \$(kubectl get pods -n ${env.KANIKO_NAMESPACE} -l job-name=${jobName} -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                                    echo "--- Pod: \$POD ---"
+                                    kubectl logs -n ${env.KANIKO_NAMESPACE} "\$POD" -c kaniko --tail=500 2>/dev/null \\
+                                      || kubectl logs -n ${env.KANIKO_NAMESPACE} "\$POD" --all-containers --tail=500 2>/dev/null \\
+                                      || true
+                                  done
+                                  kubectl delete job ${jobName} -n ${env.KANIKO_NAMESPACE} --ignore-not-found || true
+                                  exit 1
+                                fi
                                 kubectl delete job ${jobName} -n ${env.KANIKO_NAMESPACE} --ignore-not-found
                             """
                         }
