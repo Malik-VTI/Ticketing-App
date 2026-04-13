@@ -146,7 +146,12 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 		switch itemReq.ItemType {
 		case "train":
 			if len(seatNumbers) == 0 {
-				seatNumbers = []string{"A1"} // Fallback if not provided
+				_ = tx.Rollback()
+				return nil, fmt.Errorf("train_reservation_failed: seat_numbers required in metadata (one per passenger)")
+			}
+			if len(seatNumbers) != itemReq.Quantity {
+				_ = tx.Rollback()
+				return nil, fmt.Errorf("train_reservation_failed: need %d seat_numbers (quantity), got %d", itemReq.Quantity, len(seatNumbers))
 			}
 			if err := s.catalogClient.ReserveTrainSeats(itemReq.ItemRefID, seatNumbers); err != nil {
 				_ = tx.Rollback()
@@ -154,9 +159,14 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 			}
 		case "flight":
 			if len(seatNumbers) == 0 {
-				seatNumbers = []string{"1A"} // Fallback if not provided
+				_ = tx.Rollback()
+				return nil, fmt.Errorf("flight_reservation_failed: seat_numbers required in metadata (one per passenger)")
 			}
-			if err := s.catalogClient.ReserveFlightSeats(itemReq.ItemRefID, seatNumbers); err != nil { 
+			if len(seatNumbers) != itemReq.Quantity {
+				_ = tx.Rollback()
+				return nil, fmt.Errorf("flight_reservation_failed: need %d seat_numbers (quantity), got %d", itemReq.Quantity, len(seatNumbers))
+			}
+			if err := s.catalogClient.ReserveFlightSeats(itemReq.ItemRefID, seatNumbers); err != nil {
 				_ = tx.Rollback()
 				return nil, fmt.Errorf("flight_reservation_failed: %w", err)
 			}

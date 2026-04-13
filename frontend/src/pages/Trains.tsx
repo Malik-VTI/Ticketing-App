@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, ChangeEvent } from 'react'
+import { FormEvent, useEffect, useState, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trainAPI, TrainSchedule, Station, bookingAPI, PricingResponse } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -47,6 +47,9 @@ const Trains = () => {
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState('')
   const [calculatedPricing, setCalculatedPricing] = useState<PricingResponse | null>(null)
+  const [allocatedSeatNumbers, setAllocatedSeatNumbers] = useState<string[]>([])
+  const [seatsAllocationLoading, setSeatsAllocationLoading] = useState(false)
+  const [seatsAllocationError, setSeatsAllocationError] = useState('')
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -54,6 +57,52 @@ const Trains = () => {
     }
     fetchInitialData()
   }, [])
+
+  useEffect(() => {
+    if (!showBookingModal || !selectedTrain?.id || !bookingForm.seatClass) {
+      setAllocatedSeatNumbers([])
+      setSeatsAllocationError('')
+      setSeatsAllocationLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setSeatsAllocationLoading(true)
+    setSeatsAllocationError('')
+    setAllocatedSeatNumbers([])
+
+    const cls = bookingForm.seatClass.toLowerCase()
+    trainAPI
+      .getAvailableSeats(selectedTrain.id)
+      .then((available) => {
+        if (cancelled) return
+        const matching = available.filter(
+          (s) =>
+            (s.seatClass ?? '').toLowerCase() === cls &&
+            (s.status ?? '').toLowerCase() === 'available'
+        )
+        const n = bookingForm.numPassengers
+        if (matching.length < n) {
+          setSeatsAllocationError(
+            `Only ${matching.length} seat(s) available in ${bookingForm.seatClass} for this train (need ${n}).`
+          )
+          return
+        }
+        setAllocatedSeatNumbers(matching.slice(0, n).map((s) => s.seatNumber))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSeatsAllocationError('Could not load available seats. Try again or pick another class.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSeatsAllocationLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [showBookingModal, selectedTrain?.id, bookingForm.seatClass, bookingForm.numPassengers])
 
   const loadStations = async () => {
     try {
@@ -163,6 +212,9 @@ const Trains = () => {
       passengerNames: [''],
     })
     setBookingError('')
+    setCalculatedPricing(null)
+    setAllocatedSeatNumbers([])
+    setSeatsAllocationError('')
     setShowBookingModal(true)
   }
 
@@ -171,6 +223,8 @@ const Trains = () => {
     setSelectedTrain(null)
     setBookingError('')
     setCalculatedPricing(null)
+    setAllocatedSeatNumbers([])
+    setSeatsAllocationError('')
   }
 
   const handleBookingFormChange = (field: string, value: any) => {
@@ -200,6 +254,11 @@ const Trains = () => {
     if (bookingForm.passengerNames.some((name) => !name.trim())) return setBookingError('Please enter all passenger names')
     if (!user) return setBookingError('You must be logged in to create a booking')
     if (!calculatedPricing) return setBookingError('Pricing is still calculating or failed.')
+    if (seatsAllocationLoading) return setBookingError('Still assigning seats…')
+    if (seatsAllocationError) return setBookingError(seatsAllocationError)
+    if (allocatedSeatNumbers.length !== bookingForm.numPassengers) {
+      return setBookingError('Seat assignment does not match passenger count. Adjust class or passenger count.')
+    }
 
     setBookingLoading(true)
     setBookingError('')
@@ -216,7 +275,7 @@ const Trains = () => {
             quantity: Number(bookingForm.numPassengers),
             metadata: {
               passenger_names: bookingForm.passengerNames,
-              seat_numbers: [],
+              seat_numbers: allocatedSeatNumbers,
             },
           },
         ],
@@ -569,6 +628,17 @@ const Trains = () => {
                       <option key={s.seatClass} value={s.seatClass}>{s.seatClass} - {s.availableCount} available</option>
                     ))}
                   </select>
+                  {bookingForm.seatClass && seatsAllocationLoading && (
+                    <p className="text-muted" style={{ marginTop: 8, fontSize: '0.875rem' }}>Assigning seats…</p>
+                  )}
+                  {seatsAllocationError && (
+                    <p className="error-message" style={{ marginTop: 8 }} role="alert">{seatsAllocationError}</p>
+                  )}
+                  {!seatsAllocationLoading && !seatsAllocationError && allocatedSeatNumbers.length > 0 && (
+                    <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#374151' }}>
+                      Seats reserved for booking: <strong>{allocatedSeatNumbers.join(', ')}</strong>
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Number of Passengers</label>
@@ -589,7 +659,17 @@ const Trains = () => {
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={handleCloseModal} disabled={bookingLoading}>Cancel</button>
-              <button className="btn-submit" onClick={handleSubmitBooking} disabled={bookingLoading || !calculatedPricing}>
+              <button
+                className="btn-submit"
+                onClick={handleSubmitBooking}
+                disabled={
+                  bookingLoading ||
+                  !calculatedPricing ||
+                  seatsAllocationLoading ||
+                  !!seatsAllocationError ||
+                  allocatedSeatNumbers.length !== bookingForm.numPassengers
+                }
+              >
                 {bookingLoading ? 'Processing...' : 'Confirm Booking'}
               </button>
             </div>

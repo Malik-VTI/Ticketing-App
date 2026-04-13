@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -54,28 +57,45 @@ public class FlightService {
     }
 
     public List<FlightSeatDTO> getAvailableSeatsBySchedule(UUID scheduleId) {
-        List<FlightSeat> seats = seatRepository.findByFlightScheduleIdAndStatus(scheduleId, "available");
-        return seats.stream()
+        // Match aggregate logic: Spring Data / JPQL status equality is case-sensitive and can return no rows.
+        return seatRepository.findByFlightScheduleId(scheduleId).stream()
+                .filter(s -> "available".equalsIgnoreCase(s.getStatus()))
                 .map(this::convertSeatToDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public void reserveSeats(UUID scheduleId, List<String> seatNumbers) {
-        List<FlightSeat> seats = seatRepository.findByFlightScheduleIdAndSeatNumberIn(scheduleId, seatNumbers);
-        
-        if (seats.size() != seatNumbers.size()) {
-            throw new ResourceNotFoundException("Some seats in " + seatNumbers + " not found for schedule " + scheduleId);
+        // Same pattern as train: avoid IN-query returning multiple rows per label; trim + case-insensitive match.
+        List<String> wanted = seatNumbers.stream()
+                .map(s -> s == null ? "" : s.trim())
+                .collect(Collectors.toList());
+
+        List<FlightSeat> allForSchedule = seatRepository.findByFlightScheduleId(scheduleId);
+        List<FlightSeat> matched = new ArrayList<>(wanted.size());
+        Set<UUID> pickedIds = new HashSet<>();
+
+        for (String label : wanted) {
+            if (label.isEmpty()) {
+                throw new ResourceNotFoundException("Empty seat number in request for schedule " + scheduleId);
+            }
+            FlightSeat pick = allForSchedule.stream()
+                    .filter(s -> !pickedIds.contains(s.getId()))
+                    .filter(s -> s.getSeatNumber() != null && label.equalsIgnoreCase(s.getSeatNumber().trim()))
+                    .filter(s -> "available".equalsIgnoreCase(s.getStatus()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Seat " + label + " not found or not available for schedule " + scheduleId));
+
+            matched.add(pick);
+            pickedIds.add(pick.getId());
         }
 
-        for (FlightSeat seat : seats) {
-            if (!"available".equals(seat.getStatus())) {
-                throw new IllegalStateException("Seat " + seat.getSeatNumber() + " is already " + seat.getStatus());
-            }
+        for (FlightSeat seat : matched) {
             seat.setStatus("booked");
         }
-        
-        seatRepository.saveAll(seats);
+
+        seatRepository.saveAll(matched);
     }
 
     public List<FlightScheduleDTO> searchByAirportNames(
@@ -115,7 +135,7 @@ public class FlightService {
                 .entrySet().stream()
                 .map(entry -> {
                     long available = entry.getValue().stream()
-                            .filter(s -> "available".equals(s.getStatus()))
+                            .filter(s -> "available".equalsIgnoreCase(s.getStatus()))
                             .count();
                     return new SeatInfo(
                             entry.getKey(),

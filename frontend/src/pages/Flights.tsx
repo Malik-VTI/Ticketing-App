@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, ChangeEvent } from 'react'
+import { FormEvent, useEffect, useState, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { flightAPI, FlightSchedule, Airport, bookingAPI, PricingResponse } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -47,6 +47,9 @@ const Flights = () => {
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState('')
   const [calculatedPricing, setCalculatedPricing] = useState<PricingResponse | null>(null)
+  const [allocatedSeatNumbers, setAllocatedSeatNumbers] = useState<string[]>([])
+  const [seatsAllocationLoading, setSeatsAllocationLoading] = useState(false)
+  const [seatsAllocationError, setSeatsAllocationError] = useState('')
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -54,6 +57,52 @@ const Flights = () => {
     }
     fetchInitialData()
   }, [])
+
+  useEffect(() => {
+    if (!showBookingModal || !selectedFlight?.id || !bookingForm.seatClass) {
+      setAllocatedSeatNumbers([])
+      setSeatsAllocationError('')
+      setSeatsAllocationLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setSeatsAllocationLoading(true)
+    setSeatsAllocationError('')
+    setAllocatedSeatNumbers([])
+
+    const cls = bookingForm.seatClass.toLowerCase()
+    flightAPI
+      .getAvailableSeats(selectedFlight.id)
+      .then((available) => {
+        if (cancelled) return
+        const matching = available.filter(
+          (s) =>
+            (s.seatClass ?? '').toLowerCase() === cls &&
+            (s.status ?? '').toLowerCase() === 'available'
+        )
+        const n = bookingForm.numPassengers
+        if (matching.length < n) {
+          setSeatsAllocationError(
+            `Only ${matching.length} seat(s) available in ${bookingForm.seatClass} for this flight (need ${n}).`
+          )
+          return
+        }
+        setAllocatedSeatNumbers(matching.slice(0, n).map((s) => s.seatNumber))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSeatsAllocationError('Could not load available seats. Try again or pick another class.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSeatsAllocationLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [showBookingModal, selectedFlight?.id, bookingForm.seatClass, bookingForm.numPassengers])
 
   const loadAirports = async () => {
     try {
@@ -149,6 +198,9 @@ const Flights = () => {
       passengerNames: [''],
     })
     setBookingError('')
+    setCalculatedPricing(null)
+    setAllocatedSeatNumbers([])
+    setSeatsAllocationError('')
     setShowBookingModal(true)
   }
 
@@ -157,6 +209,8 @@ const Flights = () => {
     setSelectedFlight(null)
     setBookingError('')
     setCalculatedPricing(null)
+    setAllocatedSeatNumbers([])
+    setSeatsAllocationError('')
   }
 
   const handleBookingFormChange = (field: string, value: any) => {
@@ -186,12 +240,18 @@ const Flights = () => {
     if (bookingForm.passengerNames.some((name) => !name.trim())) return setBookingError('Please enter all passenger names')
     if (!user) return setBookingError('You must be logged in to create a booking')
     if (!calculatedPricing) return setBookingError('Pricing is still calculating or failed. Please refresh.')
+    if (seatsAllocationLoading) return setBookingError('Still assigning seats…')
+    if (seatsAllocationError) return setBookingError(seatsAllocationError)
+    if (allocatedSeatNumbers.length !== bookingForm.numPassengers) {
+      return setBookingError('Seat assignment does not match passenger count. Adjust class or passenger count.')
+    }
 
     setBookingLoading(true)
     setBookingError('')
 
     try {
-      const selectedFare = selectedFlight.fares?.find((f) => f.seatClass === bookingForm.seatClass)
+      const fareClass = bookingForm.seatClass.toLowerCase()
+      const selectedFare = selectedFlight.fares?.find((f) => f.seatClass.toLowerCase() === fareClass)
       if (!selectedFare) throw new Error('Selected fare not found')
 
       const itemPrice = calculatedPricing.totalPrice / bookingForm.numPassengers
@@ -203,7 +263,10 @@ const Flights = () => {
             item_ref_id: selectedFlight.id,
             price: itemPrice,
             quantity: Number(bookingForm.numPassengers),
-            metadata: { passenger_names: bookingForm.passengerNames },
+            metadata: {
+              passenger_names: bookingForm.passengerNames,
+              seat_numbers: allocatedSeatNumbers,
+            },
           },
         ],
       })
@@ -557,6 +620,20 @@ const Flights = () => {
                       <option key={f.seatClass} value={f.seatClass}>{f.seatClass} - {f.currency} {f.basePrice}</option>
                     ))}
                   </select>
+                  {bookingForm.seatClass && seatsAllocationLoading && (
+                    <p className="text-muted" style={{ marginTop: 8, fontSize: '0.875rem' }}>Assigning seats…</p>
+                  )}
+                  {seatsAllocationError && (
+                    <div className="alert-error" style={{ marginTop: 8 }} role="alert">
+                      <span className="alert-icon">⚠️</span>
+                      {seatsAllocationError}
+                    </div>
+                  )}
+                  {!seatsAllocationLoading && !seatsAllocationError && allocatedSeatNumbers.length > 0 && (
+                    <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#374151' }}>
+                      Seats reserved for booking: <strong>{allocatedSeatNumbers.join(', ')}</strong>
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Number of Passengers</label>
@@ -570,11 +647,19 @@ const Flights = () => {
                 </div>
                 {bookingForm.seatClass && (
                   <div className="price-summary" style={{ padding: 0, border: 'none', marginTop: '1rem', background: 'transparent' }}>
-                    <PromoCodeInput 
-                      basePrice={(selectedFlight.fares?.find((f) => f.seatClass === bookingForm.seatClass)?.basePrice || 0) * bookingForm.numPassengers} 
-                      currency={selectedFlight.fares?.find((f) => f.seatClass === bookingForm.seatClass)?.currency || 'IDR'} 
-                      onPriceCalculated={setCalculatedPricing} 
-                      onError={setBookingError} 
+                    <PromoCodeInput
+                      basePrice={
+                        (selectedFlight.fares?.find(
+                          (f) => f.seatClass.toLowerCase() === bookingForm.seatClass.toLowerCase()
+                        )?.basePrice || 0) * bookingForm.numPassengers
+                      }
+                      currency={
+                        selectedFlight.fares?.find(
+                          (f) => f.seatClass.toLowerCase() === bookingForm.seatClass.toLowerCase()
+                        )?.currency || 'IDR'
+                      }
+                      onPriceCalculated={setCalculatedPricing}
+                      onError={setBookingError}
                     />
                   </div>
                 )}
@@ -582,7 +667,17 @@ const Flights = () => {
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={handleCloseModal} disabled={bookingLoading}>Cancel</button>
-              <button className="btn-submit" onClick={handleSubmitBooking} disabled={bookingLoading || !calculatedPricing}>
+              <button
+                className="btn-submit"
+                onClick={handleSubmitBooking}
+                disabled={
+                  bookingLoading ||
+                  !calculatedPricing ||
+                  seatsAllocationLoading ||
+                  !!seatsAllocationError ||
+                  allocatedSeatNumbers.length !== bookingForm.numPassengers
+                }
+              >
                 {bookingLoading ? 'Processing...' : 'Confirm Booking'}
               </button>
             </div>

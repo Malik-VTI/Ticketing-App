@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,12 +94,25 @@ func (c *catalogClient) doPost(url string, body interface{}, response interface{
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
 		var errResp struct {
 			Error   string `json:"error"`
 			Message string `json:"message"`
 		}
-		json.NewDecoder(resp.Body).Decode(&errResp)
-		return fmt.Errorf("catalog_error: %s - %s", errResp.Error, errResp.Message)
+		_ = json.Unmarshal(body, &errResp)
+		detail := strings.TrimSpace(errResp.Error + " - " + errResp.Message)
+		if detail == "-" {
+			snippet := strings.TrimSpace(string(body))
+			if len(snippet) > 200 {
+				snippet = snippet[:200] + "…"
+			}
+			if snippet != "" {
+				detail = snippet
+			} else {
+				detail = http.StatusText(resp.StatusCode)
+			}
+		}
+		return fmt.Errorf("catalog_error (HTTP %d): %s", resp.StatusCode, detail)
 	}
 
 	if response != nil {

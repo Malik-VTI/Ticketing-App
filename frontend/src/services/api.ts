@@ -172,6 +172,14 @@ export interface FareInfo {
   currency: string
 }
 
+export interface FlightSeatDTO {
+  id: string
+  flightScheduleId: string
+  seatNumber: string
+  seatClass: string
+  status: string
+}
+
 export interface FlightSchedule {
   id: string
   flightId: string
@@ -253,7 +261,12 @@ export const flightAPI = {
   },
 
   getScheduleSeats: async (id: string) => {
-    const response = await api.get<SeatInfo[]>(`/flights/schedules/${id}/seats`)
+    const response = await api.get<FlightSeatDTO[]>(`/flights/schedules/${id}/seats`)
+    return response.data
+  },
+
+  getAvailableSeats: async (id: string): Promise<FlightSeatDTO[]> => {
+    const response = await api.get<FlightSeatDTO[]>(`/flights/schedules/${id}/seats/available`)
     return response.data
   },
 }
@@ -338,6 +351,11 @@ export const trainAPI = {
 
   getScheduleSeats: async (id: string) => {
     const response = await api.get<CoachSeatDTO[]>(`/trains/schedules/${id}/seats`)
+    return response.data
+  },
+
+  getAvailableSeats: async (id: string): Promise<CoachSeatDTO[]> => {
+    const response = await api.get<CoachSeatDTO[]>(`/trains/schedules/${id}/seats/available`)
     return response.data
   },
 }
