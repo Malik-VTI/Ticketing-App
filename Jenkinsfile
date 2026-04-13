@@ -55,19 +55,21 @@ pipeline {
                     }
                     def kanikoContext = "${repoUrl}#${env.GIT_COMMIT}"
 
+                    // Important: each Dockerfile uses COPY relative to its service directory.
+                    // We therefore build with a context sub-path per service.
                     def services = [
-                        [name: 'frontend', dockerfile: 'frontend/Dockerfile'],
-                        [name: 'api-gateway', dockerfile: 'api-gateaway/Dockerfile'],
-                        [name: 'authentication-service', dockerfile: 'backend/authentication-service/Dockerfile'],
-                        [name: 'booking-service', dockerfile: 'backend/booking-service/Dockerfile'],
-                        [name: 'payment-service', dockerfile: 'backend/payment-service/Dockerfile'],
-                        [name: 'flight-service', dockerfile: 'backend/catalog-service/flight-service/Dockerfile'],
-                        [name: 'hotel-service', dockerfile: 'backend/catalog-service/hotel-service/Dockerfile'],
-                        [name: 'train-service', dockerfile: 'backend/catalog-service/train-service/Dockerfile'],
-                        [name: 'profile-service', dockerfile: 'backend/profile-service/Dockerfile'],
-                        [name: 'pricing-service', dockerfile: 'backend/pricing-service/Dockerfile'],
-                        [name: 'notification-service', dockerfile: 'backend/notification-service/Dockerfile'],
-                        [name: 'admin-service', dockerfile: 'backend/admin-service/Dockerfile']
+                        [name: 'frontend', path: 'frontend'],
+                        [name: 'api-gateway', path: 'api-gateaway'],
+                        [name: 'authentication-service', path: 'backend/authentication-service'],
+                        [name: 'booking-service', path: 'backend/booking-service'],
+                        [name: 'payment-service', path: 'backend/payment-service'],
+                        [name: 'flight-service', path: 'backend/catalog-service/flight-service'],
+                        [name: 'hotel-service', path: 'backend/catalog-service/hotel-service'],
+                        [name: 'train-service', path: 'backend/catalog-service/train-service'],
+                        [name: 'profile-service', path: 'backend/profile-service'],
+                        [name: 'pricing-service', path: 'backend/pricing-service'],
+                        [name: 'notification-service', path: 'backend/notification-service'],
+                        [name: 'admin-service', path: 'backend/admin-service']
                     ]
 
                     withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG_PATH')]) {
@@ -103,8 +105,9 @@ spec:
         - name: kaniko
           image: ${env.KANIKO_EXECUTOR_IMAGE}
           args:
-            - "--dockerfile=${svc.dockerfile}"
+            - "--dockerfile=Dockerfile"
             - "--context=${kanikoContext}"
+            - "--context-sub-path=${svc.path}"
             - "--destination=${dest}"
             - "--verbosity=info"
           env:
