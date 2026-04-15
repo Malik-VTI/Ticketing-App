@@ -194,15 +194,6 @@ const Trains = () => {
     return `${hours}h ${minutes}m`
   }
 
-  const _getDayAndDateStr = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    return {
-      date: `${d.getDate()} ${d.toLocaleString?.('default', { month: 'short' }) ?? ''}`,
-      day: days[d.getDay()]
-    }
-  }
-
   /* Booking Logic */
   const handleBookNow = (train: TrainSchedule) => {
     setSelectedTrain(train)

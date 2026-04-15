@@ -98,13 +98,6 @@ const Hotels = () => {
     }
   }
 
-  const _handleReset = () => {
-    setSearchMode(false)
-    setSearchParams(prev => ({ ...prev, city: '' }))
-    setError('')
-    loadHotels(0)
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setSearchParams(prev => ({
       ...prev,

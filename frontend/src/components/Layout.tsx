@@ -5,7 +5,6 @@ import './Layout.css'
 const Layout = () => {
   const { user, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
 
   const handleLogout = () => {
     logout()
