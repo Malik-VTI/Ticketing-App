@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ticketing-app/frontend:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/frontend:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http

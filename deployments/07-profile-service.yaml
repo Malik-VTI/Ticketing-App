@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: profile-service
-        image: ticketing-app/profile-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/profile-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8085
           name: http

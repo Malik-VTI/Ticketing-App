@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: authentication-service
-        image: ticketing-app/authentication-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/authentication-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8081
           name: http

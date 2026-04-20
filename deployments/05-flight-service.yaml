@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: flight-service
-        image: ticketing-app/flight-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/flight-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8083
           name: http

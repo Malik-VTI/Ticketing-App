@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: pricing-service
-        image: ticketing-app/pricing-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/pricing-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8086
           name: http

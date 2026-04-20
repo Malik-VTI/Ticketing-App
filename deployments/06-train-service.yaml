@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: train-service
-        image: ticketing-app/train-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/train-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8084
           name: http

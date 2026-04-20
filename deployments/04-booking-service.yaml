@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: booking-service
-        image: ticketing-app/booking-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/booking-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8082
           name: http

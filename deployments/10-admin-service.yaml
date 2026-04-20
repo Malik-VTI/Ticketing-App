@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: admin-service
-        image: ticketing-app/admin-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/admin-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8088
           name: http
