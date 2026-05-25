@@ -18,7 +18,7 @@ spec:
       containers:
       - name: notification-service
         image: malikvti/notification-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8087
           name: http
@@ -37,13 +37,13 @@ spec:
             cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /notifications/health
+            path: /health
             port: 8087
           initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /notifications/health
+            path: /health
             port: 8087
           initialDelaySeconds: 30
           periodSeconds: 5

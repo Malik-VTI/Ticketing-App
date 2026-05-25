@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: admin-service
-        image: malikvti/admin-service:latest
-        imagePullPolicy: Always
+        image: malikvti/admin-service:1.0.1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8088
           name: http
@@ -37,13 +37,13 @@ spec:
             cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /admin/health
+            path: /api/admin/health
             port: 8088
           initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /admin/health
+            path: /api/admin/health
             port: 8088
           initialDelaySeconds: 30
           periodSeconds: 5

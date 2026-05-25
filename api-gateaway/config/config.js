@@ -1,9 +1,12 @@
 require('dotenv').config({ path: '../../.env' });
 
+const gatewayPort = process.env.API_GATEWAY_PORT;
+const port = process.env.PORT || (gatewayPort && !gatewayPort.startsWith('tcp') ? gatewayPort : 3000);
+
 const config = {
   server: {
-    port: process.env.API_GATEWAY_PORT || process.env.PORT || 3000,
-    host: process.env.API_GATEWAY_HOST || process.env.HOST || '0.0.0.0',
+    port: port,
+    host: process.env.HOST || '0.0.0.0',
   },
   
   jwt: {

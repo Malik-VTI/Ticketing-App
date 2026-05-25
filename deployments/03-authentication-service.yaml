@@ -18,11 +18,13 @@ spec:
       containers:
       - name: authentication-service
         image: malikvti/authentication-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
           name: http
         env:
+        - name: AUTH_SERVICE_PORT
+          value: "8081"
         - name: DB_SERVER
           valueFrom:
             secretKeyRef:

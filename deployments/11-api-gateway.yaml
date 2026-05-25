@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: malikvti/api-gateway:latest
-        imagePullPolicy: Always
+        image: malikvti/api-gateway:1.0.1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http
@@ -44,13 +44,13 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /health
+            path: /api/health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /api/health
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5

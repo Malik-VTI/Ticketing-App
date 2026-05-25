@@ -18,13 +18,16 @@ spec:
       containers:
       - name: booking-service
         image: malikvti/booking-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
           name: http
         envFrom:
         - secretRef:
             name: ticketing-secrets
+        env:
+        - name: BOOKING_SERVICE_PORT
+          value: "8082"
         resources:
           requests:
             memory: "128Mi"

@@ -18,7 +18,7 @@ spec:
       containers:
       - name: frontend
         image: malikvti/frontend:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
           name: http
