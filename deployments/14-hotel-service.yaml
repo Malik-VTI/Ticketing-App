@@ -19,6 +19,9 @@ spec:
       - name: hotel-service
         image: malikvti/hotel-service:latest
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: service-urls
         ports:
         - containerPort: 8085
           name: http

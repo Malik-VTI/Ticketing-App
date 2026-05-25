@@ -26,6 +26,8 @@ spec:
         - name: NOTIFICATION_SERVICE_PORT
           value: "8087"
         envFrom:
+        - configMapRef:
+            name: service-urls
         - secretRef:
             name: ticketing-secrets
         resources:

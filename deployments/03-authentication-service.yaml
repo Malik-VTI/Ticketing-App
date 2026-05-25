@@ -19,6 +19,9 @@ spec:
       - name: authentication-service
         image: malikvti/authentication-service:latest
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: service-urls
         ports:
         - containerPort: 8081
           name: http

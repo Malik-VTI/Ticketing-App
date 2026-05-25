@@ -26,6 +26,8 @@ spec:
         - name: ADMIN_SERVICE_PORT
           value: "8088"
         envFrom:
+        - configMapRef:
+            name: service-urls
         - secretRef:
             name: ticketing-secrets
         resources:
