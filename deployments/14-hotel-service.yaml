@@ -18,11 +18,13 @@ spec:
       containers:
       - name: hotel-service
         image: malikvti/hotel-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8085
           name: http
         env:
+        - name: HOTEL_SERVICE_PORT
+          value: "8085"
         - name: DB_SERVER
           valueFrom:
             secretKeyRef:

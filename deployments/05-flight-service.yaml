@@ -18,7 +18,7 @@ spec:
       containers:
       - name: flight-service
         image: malikvti/flight-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8083
           name: http

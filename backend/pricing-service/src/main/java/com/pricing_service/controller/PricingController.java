@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/pricing")
@@ -15,6 +16,11 @@ import java.math.BigDecimal;
 public class PricingController {
 
     private final PricingService pricingService;
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "UP"));
+    }
 
     @GetMapping("/calculate")
     public ResponseEntity<PricingResponse> calculatePrice(

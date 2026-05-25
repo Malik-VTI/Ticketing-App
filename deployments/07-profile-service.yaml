@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: profile-service
-        image: malikvti/profile-service:latest
-        imagePullPolicy: Always
+        image: malikvti/profile-service:1.0.1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8085
           name: http
@@ -37,13 +37,13 @@ spec:
             cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /users/health
+            path: /profile/health
             port: 8085
           initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /users/health
+            path: /profile/health
             port: 8085
           initialDelaySeconds: 30
           periodSeconds: 5

@@ -25,6 +25,11 @@ public class ProfileController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "UP"));
+    }
+
     @GetMapping
     public ResponseEntity<?> getProfile(@RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
         if (userIdHeader == null || userIdHeader.isEmpty()) {

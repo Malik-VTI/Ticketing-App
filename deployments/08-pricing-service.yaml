@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: pricing-service
-        image: malikvti/pricing-service:latest
-        imagePullPolicy: Always
+        image: malikvti/pricing-service:1.0.1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8086
           name: http
