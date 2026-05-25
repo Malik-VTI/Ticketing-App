@@ -309,6 +309,46 @@ func (h *HotelHandler) ReserveRooms(c *gin.Context) {
 	})
 }
 
+// ReleaseRooms handles POST /hotels/:id/release
+func (h *HotelHandler) ReleaseRooms(c *gin.Context) {
+	var req models.ReleaseRoomsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "validation_error",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to start transaction",
+		})
+		return
+	}
+	defer tx.Rollback()
+
+	if err := h.roomRepo.ReleaseRooms(tx, req.RoomNumbers, req.RoomTypeID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "release_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to commit transaction",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "released"})
+}
+
 // GetRates handles GET /hotels/:id/rates
 func (h *HotelHandler) GetRates(c *gin.Context) {
 	hotelIDStr := c.Param("id")

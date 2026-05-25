@@ -25,6 +25,9 @@ type CatalogClient interface {
 	ReserveTrainSeats(scheduleID uuid.UUID, seatNumbers []string) error
 	ReserveFlightSeats(scheduleID uuid.UUID, seatNumbers []string) error
 	ReserveHotelRooms(hotelID uuid.UUID, rtID uuid.UUID, checkIn, checkOut string, qty int) ([]string, error)
+	ReleaseTrainSeats(scheduleID uuid.UUID, seatNumbers []string) error
+	ReleaseFlightSeats(scheduleID uuid.UUID, seatNumbers []string) error
+	ReleaseHotelRooms(hotelID uuid.UUID, rtID uuid.UUID, roomNumbers []string) error
 }
 
 type catalogClient struct {
@@ -60,7 +63,7 @@ func (c *catalogClient) ReserveFlightSeats(scheduleID uuid.UUID, seatNumbers []s
 func (c *catalogClient) ReserveHotelRooms(hotelID uuid.UUID, rtID uuid.UUID, checkIn, checkOut string, qty int) ([]string, error) {
 	url := os.Getenv("HOTEL_SERVICE_URL")
 	if url == "" {
-		url = "http://localhost:8083" // Wait, check docker-compose for hotel service port
+		url = "http://localhost:8085"
 	}
 
 	reqBody := ReserveRequest{
@@ -120,4 +123,41 @@ func (c *catalogClient) doPost(url string, body interface{}, response interface{
 	}
 
 	return nil
+}
+
+func (c *catalogClient) ReleaseTrainSeats(scheduleID uuid.UUID, seatNumbers []string) error {
+	url := os.Getenv("TRAIN_SERVICE_URL")
+	if url == "" {
+		url = "http://localhost:8084"
+	}
+
+	reqBody := ReserveRequest{SeatNumbers: seatNumbers}
+	return c.doPost(fmt.Sprintf("%s/trains/schedules/%s/release", url, scheduleID), reqBody, nil)
+}
+
+func (c *catalogClient) ReleaseFlightSeats(scheduleID uuid.UUID, seatNumbers []string) error {
+	url := os.Getenv("FLIGHT_SERVICE_URL")
+	if url == "" {
+		url = "http://localhost:8083"
+	}
+
+	reqBody := ReserveRequest{SeatNumbers: seatNumbers}
+	return c.doPost(fmt.Sprintf("%s/flights/schedules/%s/release", url, scheduleID), reqBody, nil)
+}
+
+func (c *catalogClient) ReleaseHotelRooms(hotelID uuid.UUID, rtID uuid.UUID, roomNumbers []string) error {
+	url := os.Getenv("HOTEL_SERVICE_URL")
+	if url == "" {
+		url = "http://localhost:8085"
+	}
+
+	reqBody := struct {
+		RoomNumbers []string `json:"room_numbers"`
+		RoomTypeID  uuid.UUID `json:"room_type_id"`
+	}{
+		RoomNumbers: roomNumbers,
+		RoomTypeID:  rtID,
+	}
+
+	return c.doPost(fmt.Sprintf("%s/hotels/%s/release", url, hotelID), reqBody, nil)
 }

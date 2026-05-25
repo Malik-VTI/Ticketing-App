@@ -79,6 +79,16 @@ public class TrainController {
         }
     }
 
+    @PostMapping("/schedules/{id}/release")
+    public ResponseEntity<?> releaseSeats(@PathVariable UUID id, @Valid @RequestBody ReserveSeatsRequest request) {
+        try {
+            trainService.releaseSeats(id, request.getSeatNumbers());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Train Service is running");

@@ -280,6 +280,38 @@ func (s *bookingService) CancelBooking(id uuid.UUID) error {
 		return bookingerrors.ErrAlreadyCancelled
 	}
 
+	items, err := s.bookingItemRepo.FindByBookingID(id)
+	if err != nil {
+		return fmt.Errorf("failed to get booking items: %w", err)
+	}
+
+	for _, item := range items {
+		var metadata *models.BookingMetadata
+		if item.Metadata != "" {
+			metadata = &models.BookingMetadata{}
+			if err := metadata.FromJSON(item.Metadata); err != nil {
+				metadata = nil
+			}
+		}
+
+		if metadata != nil {
+			switch item.ItemType {
+			case "train":
+				if len(metadata.SeatNumbers) > 0 {
+					_ = s.catalogClient.ReleaseTrainSeats(item.ItemRefID, metadata.SeatNumbers)
+				}
+			case "flight":
+				if len(metadata.SeatNumbers) > 0 {
+					_ = s.catalogClient.ReleaseFlightSeats(item.ItemRefID, metadata.SeatNumbers)
+				}
+			case "hotel":
+				if len(metadata.RoomNumbers) > 0 {
+					_ = s.catalogClient.ReleaseHotelRooms(uuid.Nil, item.ItemRefID, metadata.RoomNumbers)
+				}
+			}
+		}
+	}
+
 	return s.bookingRepo.UpdateStatus(id, "cancelled")
 }
 

@@ -26,6 +26,7 @@ type RoomRepository interface {
 	FindAvailableByRoomTypeID(roomTypeID uuid.UUID, checkIn, checkOut string) ([]*models.Room, error)
 	Update(room *models.Room) error
 	ReserveRooms(tx *sql.Tx, qty int, roomTypeID uuid.UUID) ([]string, error)
+	ReleaseRooms(tx *sql.Tx, roomNumbers []string, roomTypeID uuid.UUID) error
 	Delete(id uuid.UUID) error
 }
 
@@ -412,6 +413,16 @@ func (r *roomRepository) ReserveRooms(tx *sql.Tx, qty int, rtID uuid.UUID) ([]st
 	*/
 
 	return roomNumbers, err
+}
+
+func (r *roomRepository) ReleaseRooms(tx *sql.Tx, roomNumbers []string, rtID uuid.UUID) error {
+	if len(roomNumbers) == 0 {
+		return nil
+	}
+	
+	updateQuery := `UPDATE rooms SET status = 'available', updated_at = $1 WHERE room_type_id = $2 AND room_number = ANY($3)`
+	_, err := tx.Exec(updateQuery, time.Now(), rtID, roomNumbers)
+	return err
 }
 
 func (r *roomRepository) Delete(id uuid.UUID) error {

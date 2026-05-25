@@ -44,6 +44,7 @@ func SetupRoutes(
 		public.GET("/:id/rooms", hotelHandler.GetRooms)
 		public.GET("/:id/rates", hotelHandler.GetRates)
 		public.POST("/:id/reserve", hotelHandler.ReserveRooms)
+		public.POST("/:id/release", hotelHandler.ReleaseRooms)
 	}
 
 	// Admin routes
