@@ -98,6 +98,39 @@ public class FlightService {
         seatRepository.saveAll(matched);
     }
 
+    @Transactional
+    public void releaseSeats(UUID scheduleId, List<String> seatNumbers) {
+        List<String> wanted = seatNumbers.stream()
+                .map(s -> s == null ? "" : s.trim())
+                .collect(Collectors.toList());
+
+        List<FlightSeat> allForSchedule = seatRepository.findByFlightScheduleId(scheduleId);
+        List<FlightSeat> matched = new ArrayList<>();
+        Set<UUID> pickedIds = new HashSet<>();
+
+        for (String label : wanted) {
+            if (label.isEmpty()) continue;
+            
+            FlightSeat pick = allForSchedule.stream()
+                    .filter(s -> !pickedIds.contains(s.getId()))
+                    .filter(s -> s.getSeatNumber() != null && label.equalsIgnoreCase(s.getSeatNumber().trim()))
+                    .filter(s -> "booked".equalsIgnoreCase(s.getStatus()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (pick != null) {
+                matched.add(pick);
+                pickedIds.add(pick.getId());
+            }
+        }
+
+        for (FlightSeat seat : matched) {
+            seat.setStatus("available");
+        }
+
+        seatRepository.saveAll(matched);
+    }
+
     public List<FlightScheduleDTO> searchByAirportNames(
             String originName, String destinationName, LocalDate date) {
         List<FlightSchedule> schedules = scheduleRepository

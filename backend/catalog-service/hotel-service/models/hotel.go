@@ -186,6 +186,11 @@ type ReserveRoomsResponse struct {
 	RoomNumbers []string `json:"room_numbers"`
 }
 
+type ReleaseRoomsRequest struct {
+	RoomTypeID  uuid.UUID `json:"room_type_id" binding:"required"`
+	RoomNumbers []string  `json:"room_numbers" binding:"required"`
+}
+
 // Error response
 type ErrorResponse struct {
 	Error   string `json:"error"`

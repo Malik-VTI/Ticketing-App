@@ -313,8 +313,13 @@ const Hotels = () => {
                         </div>
                       </div>
                       <div className="price-action">
-                        {/* Mock Price for layout */}
-                        <div className="price-text">Starting from <br/><span>IDR {(Math.random() * 500000 + 300000).toFixed(0)}</span> / Night</div>
+                        <div className="price-text">Starting from <br/><span>IDR {
+                          (() => {
+                            const rates = hotel.roomTypes?.flatMap(rt => rt.rates ?? []) ?? [];
+                            const minPrice = rates.length > 0 ? Math.min(...rates.map(r => r.price)) : 0;
+                            return minPrice > 0 ? new Intl.NumberFormat('id-ID').format(minPrice) : 'TBD';
+                          })()
+                        }</span> / Night</div>
                         <Link to={hotelId ? `/hotels/${hotelId}` : '#'} className="btn-buy-now" style={{display: 'inline-block', textAlign: 'center', textDecoration: 'none'}}>
                           Select Room
                         </Link>

@@ -9,6 +9,13 @@ import './Trains.css'
 
 const PAGE_SIZE = 6
 
+const getTrainPrice = (seatClass: string) => {
+  const cls = (seatClass || '').toLowerCase()
+  if (cls.includes('executive')) return 485000
+  if (cls.includes('business')) return 250000
+  return 100000
+}
+
 const Trains = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -530,7 +537,7 @@ const Trains = () => {
                       </div>
                     </div>
                     <div className="price-action">
-                      <div className="price-text"><span>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(485000)}</span> / Person</div>
+                      <div className="price-text"><span>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(getTrainPrice(train.availableSeats?.[0]?.seatClass || 'Economy'))}</span> / Person</div>
                       <button className="btn-buy-now" onClick={() => handleBookNow(train)}>Buy Now</button>
                     </div>
                   </div>
@@ -643,7 +650,7 @@ const Trains = () => {
                 </div>
                 {bookingForm.seatClass && (
                   <div className="price-summary" style={{ padding: 0, border: 'none', marginTop: '1rem', background: 'transparent' }}>
-                    <PromoCodeInput basePrice={100000 * bookingForm.numPassengers} currency="IDR" onPriceCalculated={setCalculatedPricing} onError={setBookingError} />
+                    <PromoCodeInput basePrice={getTrainPrice(bookingForm.seatClass) * bookingForm.numPassengers} currency="IDR" onPriceCalculated={setCalculatedPricing} onError={setBookingError} />
                   </div>
                 )}
               </div>

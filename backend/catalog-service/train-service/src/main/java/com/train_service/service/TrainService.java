@@ -97,6 +97,39 @@ public class TrainService {
         seatRepository.saveAll(matched);
     }
 
+    @Transactional
+    public void releaseSeats(UUID scheduleId, List<String> seatNumbers) {
+        List<String> wanted = seatNumbers.stream()
+                .map(s -> s == null ? "" : s.trim())
+                .collect(Collectors.toList());
+
+        List<CoachSeat> allForSchedule = seatRepository.findByTrainScheduleId(scheduleId);
+        List<CoachSeat> matched = new ArrayList<>();
+        Set<UUID> pickedIds = new HashSet<>();
+
+        for (String label : wanted) {
+            if (label.isEmpty()) continue;
+            
+            CoachSeat pick = allForSchedule.stream()
+                    .filter(s -> !pickedIds.contains(s.getId()))
+                    .filter(s -> s.getSeatNumber() != null && label.equalsIgnoreCase(s.getSeatNumber().trim()))
+                    .filter(s -> "booked".equalsIgnoreCase(s.getStatus()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (pick != null) {
+                matched.add(pick);
+                pickedIds.add(pick.getId());
+            }
+        }
+
+        for (CoachSeat seat : matched) {
+            seat.setStatus("available");
+        }
+
+        seatRepository.saveAll(matched);
+    }
+
     private TrainScheduleDTO convertToDTO(TrainSchedule schedule) {
         TrainScheduleDTO dto = new TrainScheduleDTO();
         Train train = schedule.getTrain();
