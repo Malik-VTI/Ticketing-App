@@ -59,7 +59,7 @@ pipeline {
                     // We therefore build with a context sub-path per service.
                     def services = [
                         [name: 'frontend', path: 'frontend'],
-                        [name: 'api-gateway', path: 'api-gateaway'],
+                        [name: 'api-gateway', path: 'api-gateway'],
                         [name: 'authentication-service', path: 'backend/authentication-service'],
                         [name: 'booking-service', path: 'backend/booking-service'],
                         [name: 'payment-service', path: 'backend/payment-service'],

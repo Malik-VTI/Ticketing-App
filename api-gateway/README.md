@@ -102,7 +102,7 @@ Rate limiting is applied to all `/api/*` endpoints:
 ## Project Structure
 
 ```
-api-gateaway/
+api-gateway/
 ├── config/
 │   └── config.js          # Configuration management
 ├── middleware/

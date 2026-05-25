@@ -1,5 +1,5 @@
 {
-  "name": "api-gateaway",
+  "name": "api-gateway",
   "version": "1.0.0",
   "description": "API Gateway Service for Ticketing Application",
   "license": "ISC",
