@@ -26,6 +26,8 @@ spec:
         - name: FLIGHT_SERVICE_PORT
           value: "8083"
         envFrom:
+        - configMapRef:
+            name: service-urls
         - secretRef:
             name: ticketing-secrets
         resources:

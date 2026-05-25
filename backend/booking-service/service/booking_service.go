@@ -25,6 +25,8 @@ type BookingService interface {
 	GetBookingByReference(reference string) (*models.BookingDTO, error)
 	GetUserBookings(userID uuid.UUID, limit, offset int) ([]*models.BookingDTO, error)
 	CancelBooking(id uuid.UUID) error
+	ExpireBooking(id uuid.UUID) error
+	StartExpirationWorker()
 	UpdateBookingStatus(id uuid.UUID, status string) error
 }
 
@@ -313,6 +315,68 @@ func (s *bookingService) CancelBooking(id uuid.UUID) error {
 	}
 
 	return s.bookingRepo.UpdateStatus(id, "cancelled")
+}
+
+func (s *bookingService) ExpireBooking(id uuid.UUID) error {
+	booking, err := s.bookingRepo.FindByID(id)
+	if err != nil {
+		return err
+	}
+
+	if booking.Status != "pending" {
+		return fmt.Errorf("can only expire pending bookings")
+	}
+
+	items, err := s.bookingItemRepo.FindByBookingID(id)
+	if err != nil {
+		return fmt.Errorf("failed to get booking items: %w", err)
+	}
+
+	for _, item := range items {
+		var metadata *models.BookingMetadata
+		if item.Metadata != "" {
+			metadata = &models.BookingMetadata{}
+			if err := metadata.FromJSON(item.Metadata); err != nil {
+				metadata = nil
+			}
+		}
+
+		if metadata != nil {
+			switch item.ItemType {
+			case "train":
+				if len(metadata.SeatNumbers) > 0 {
+					_ = s.catalogClient.ReleaseTrainSeats(item.ItemRefID, metadata.SeatNumbers)
+				}
+			case "flight":
+				if len(metadata.SeatNumbers) > 0 {
+					_ = s.catalogClient.ReleaseFlightSeats(item.ItemRefID, metadata.SeatNumbers)
+				}
+			case "hotel":
+				if len(metadata.RoomNumbers) > 0 {
+					_ = s.catalogClient.ReleaseHotelRooms(uuid.Nil, item.ItemRefID, metadata.RoomNumbers)
+				}
+			}
+		}
+	}
+
+	return s.bookingRepo.UpdateStatus(id, "expired")
+}
+
+func (s *bookingService) StartExpirationWorker() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			threshold := time.Now().Add(-30 * time.Minute)
+			bookings, err := s.bookingRepo.FindPendingBefore(threshold)
+			if err != nil {
+				continue
+			}
+			for _, b := range bookings {
+				_ = s.ExpireBooking(b.ID)
+			}
+		}
+	}()
 }
 
 func (s *bookingService) UpdateBookingStatus(id uuid.UUID, status string) error {

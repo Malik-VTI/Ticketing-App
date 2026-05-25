@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios'
 
-const API_BASE_URL = 'http://localhost:3000/api'
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -597,8 +597,11 @@ export interface PricingResponse {
 
 export const pricingAPI = {
   calculatePrice: async (basePrice: number, couponCode?: string, currency?: string): Promise<PricingResponse> => {
-    const response = await api.get<PricingResponse>('/pricing/calculate', {
-      params: { basePrice, couponCode: couponCode || undefined, currency },
+    const response = await api.post<PricingResponse>('/pricing/calculate', {
+      basePrice,
+      couponCode: couponCode || undefined,
+      currency,
+      quantity: 1,
     })
     return response.data
   },

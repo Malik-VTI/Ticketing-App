@@ -28,6 +28,28 @@ const Hotels = () => {
     loadHotels(0)
   }, [])
 
+  // Fix 2.1: Refetch on visibility change (e.g. returning from booking)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (_searchMode) {
+          handleSearch(new Event('submit') as any)
+        } else {
+          loadHotels(_pageMeta.page)
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [_searchMode, _pageMeta.page, searchParams])
+
+  // Fix 2.2: Automatically search when checkin changes
+  useEffect(() => {
+    if (searchParams.city && searchParams.checkin && searchParams.checkout) {
+      handleSearch(new Event('submit') as any)
+    }
+  }, [searchParams.checkin])
+
   const loadHotels = async (page: number) => {
     setLoading(true)
     setError('')

@@ -38,3 +38,17 @@ tmp/
 temp/
 *.tmp
 
+# Large tar archives
+*.tar
+
+# SSH keys
+id_rsa
+id_rsa.pub
+
+# Custom setup/deploy scripts not part of codebase
+ssh_config.json
+patch_yaml.py
+update_policy.py
+upload_nodes.py
+
+

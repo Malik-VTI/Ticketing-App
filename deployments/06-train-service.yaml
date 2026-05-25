@@ -26,6 +26,8 @@ spec:
         - name: TRAIN_SERVICE_PORT
           value: "8084"
         envFrom:
+        - configMapRef:
+            name: service-urls
         - secretRef:
             name: ticketing-secrets
         resources:

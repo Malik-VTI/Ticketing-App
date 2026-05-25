@@ -36,6 +36,7 @@ func SetupRoutes(
 
 	// Initialize services and handlers
 	bookingService := service.NewBookingService(bookingRepo, bookingItemRepo, catalogClient, pricingClient)
+	bookingService.StartExpirationWorker()
 	bookingHandler := handlers.NewBookingHandler(bookingService)
 
 	// Health check

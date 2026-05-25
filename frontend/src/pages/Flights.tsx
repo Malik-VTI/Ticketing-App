@@ -104,6 +104,28 @@ const Flights = () => {
     }
   }, [showBookingModal, selectedFlight?.id, bookingForm.seatClass, bookingForm.numPassengers])
 
+  // Fix 2.1: Refetch on visibility change (e.g. returning from booking)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (_searchMode) {
+          handleSearch(new Event('submit') as any)
+        } else {
+          loadSchedules(_pageMeta.page)
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [_searchMode, _pageMeta.page, searchParams])
+
+  // Fix 2.2: Automatically search when date changes
+  useEffect(() => {
+    if (searchParams.originName && searchParams.destinationName && searchParams.date) {
+      handleSearch(new Event('submit') as any)
+    }
+  }, [searchParams.date])
+
   const loadAirports = async () => {
     try {
       const response = await flightAPI.getAirports()

@@ -26,6 +26,8 @@ spec:
         - name: PROFILE_SERVICE_PORT
           value: "8085"
         envFrom:
+        - configMapRef:
+            name: service-urls
         - secretRef:
             name: ticketing-secrets
         resources:

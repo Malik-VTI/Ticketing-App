@@ -19,6 +19,7 @@ type BookingRepository interface {
 	FindByID(id uuid.UUID) (*models.Booking, error)
 	FindByReference(reference string) (*models.Booking, error)
 	FindByUserID(userID uuid.UUID, limit, offset int) ([]*models.Booking, error)
+	FindPendingBefore(threshold time.Time) ([]*models.Booking, error)
 	UpdateStatus(id uuid.UUID, status string) error
 	Delete(id uuid.UUID) error
 	BeginTx() (*sql.Tx, error)
@@ -187,6 +188,50 @@ func (r *bookingRepository) FindByUserID(userID uuid.UUID, limit, offset int) ([
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+
+		if updatedAt.Valid {
+			booking.UpdatedAt = &updatedAt.Time
+		}
+
+		bookings = append(bookings, &booking)
+	}
+
+	return bookings, nil
+}
+
+func (r *bookingRepository) FindPendingBefore(threshold time.Time) ([]*models.Booking, error) {
+	query := `
+		SELECT id, user_id, booking_reference, booking_type, total_amount, currency, status, created_at, updated_at
+		FROM bookings
+		WHERE status = 'pending' AND created_at < $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := database.DB.Query(query, threshold)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find pending bookings: %w", err)
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		var booking models.Booking
+		var updatedAt sql.NullTime
+
+		err := rows.Scan(
+			&booking.ID,
+			&booking.UserID,
+			&booking.BookingReference,
+			&booking.BookingType,
+			&booking.TotalAmount,
+			&booking.Currency,
+			&booking.Status,
+			&booking.CreatedAt,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pending booking: %w", err)
 		}
 
 		if updatedAt.Valid {
