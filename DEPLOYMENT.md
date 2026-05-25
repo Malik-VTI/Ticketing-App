@@ -40,7 +40,7 @@ cd ticketing-app
 docker build -t ticketing-app/frontend:latest ./frontend
 
 # API Gateway
-docker build -t ticketing-app/api-gateway:latest ./api-gateaway
+docker build -t ticketing-app/api-gateway:latest ./api-gateway
 
 # Authentication Service
 docker build -t ticketing-app/authentication-service:latest ./backend/authentication-service
@@ -84,7 +84,7 @@ docker save ticketing-app/admin-service:latest | sudo ctr -n k8s.io images impor
 ```bash
 # Build all images with nerdctl
 nerdctl build -t ticketing-app/frontend:latest ./frontend
-nerdctl build -t ticketing-app/api-gateway:latest ./api-gateaway
+nerdctl build -t ticketing-app/api-gateway:latest ./api-gateway
 nerdctl build -t ticketing-app/authentication-service:latest ./backend/authentication-service
 nerdctl build -t ticketing-app/booking-service:latest ./backend/booking-service
 nerdctl build -t ticketing-app/flight-service:latest ./backend/catalog-service/flight-service

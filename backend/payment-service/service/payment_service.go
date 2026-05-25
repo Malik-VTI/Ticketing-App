@@ -134,7 +134,21 @@ func (s *paymentService) confirmBooking(bookingID uuid.UUID) {
 	url := fmt.Sprintf("%s/bookings/%s/confirm", s.bookingBaseURL, bookingID.String())
 	log.Printf("Attempting to confirm booking %s at URL: %s", bookingID, url)
 	
-	resp, err := http.Post(url, "application/json", nil)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		log.Printf("ERROR: failed to create request for booking service at %s: %v", url, err)
+		return
+	}
+	
+	internalKey := os.Getenv("INTERNAL_API_KEY")
+	if internalKey == "" {
+		internalKey = "default-internal-secret"
+	}
+	req.Header.Set("X-Internal-API-Key", internalKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("ERROR: failed to connect to booking service at %s: %v", url, err)
 		return

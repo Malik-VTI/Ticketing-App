@@ -27,7 +27,7 @@ echo.
 
 REM API Gateway
 echo [2/10] Building API Gateway...
-docker build -t %REGISTRY%/api-gateway:%TAG% ./api-gateaway
+docker build -t %REGISTRY%/api-gateway:%TAG% ./api-gateway
 if %errorlevel% neq 0 exit /b %errorlevel%
 echo √ API Gateway built successfully
 echo.

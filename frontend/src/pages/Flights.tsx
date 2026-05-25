@@ -5,6 +5,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Skeleton from '../components/Skeleton'
 import PromoCodeInput from '../components/PromoCodeInput'
+import DateCarousel from '../components/shared/DateCarousel'
+import FilterSidebar from '../components/shared/FilterSidebar'
+import PaginationControls from '../components/shared/PaginationControls'
+import BookingModal from '../components/shared/BookingModal'
 import './Flights.css' // We will create this
 
 const PAGE_SIZE = 6
@@ -24,17 +28,16 @@ const Flights = () => {
   const [loading, setLoading] = useState(true)
   const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
-  const [_searchMode, setSearchMode] = useState(false)
-  const [_pageMeta, setPageMeta] = useState({
+  const [searchMode, setSearchMode] = useState(false)
+  const [pageMeta, setPageMeta] = useState({
     page: 0,
     totalPages: 0,
     totalElements: 0,
   })
 
-  // Mock filters for UI
-  const [isReturn, setIsReturn] = useState(false)
-  const [passengers, setPassengers] = useState('1 adult')
-  const [seatClass, setSeatClass] = useState('Economy')
+  // Filters and sorting
+  const [filters, setFilters] = useState<Record<string, string[]>>({})
+  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
 
   // Booking modal state
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -104,20 +107,20 @@ const Flights = () => {
     }
   }, [showBookingModal, selectedFlight?.id, bookingForm.seatClass, bookingForm.numPassengers])
 
-  // Fix 2.1: Refetch on visibility change (e.g. returning from booking)
+  // Fix 2.1: Refetch on visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        if (_searchMode) {
+        if (searchMode) {
           handleSearch(new Event('submit') as any)
         } else {
-          loadSchedules(_pageMeta.page)
+          loadSchedules(pageMeta.page)
         }
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [_searchMode, _pageMeta.page, searchParams])
+  }, [searchMode, pageMeta.page, searchParams])
 
   // Fix 2.2: Automatically search when date changes
   useEffect(() => {
@@ -302,23 +305,23 @@ const Flights = () => {
     }
   }
 
-  // Generate dynamic date carousel starting from selected date
-  const baseDate = searchParams.date ? new Date(searchParams.date) : new Date()
-  const dateCarousel = Array.from({length: 6}).map((_, i) => {
-    const d = new Date(baseDate)
-    d.setDate(d.getDate() + i)
-    return {
-      iso: d.toISOString().split('T')[0],
-      dateStr: `${d.getDate()} ${d.toLocaleString?.('default', { month: 'short' }) ?? ''}`,
-      dayStr: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
-    }
-  })
-
-  // Helper formatting
-  const formatDurationFriendly = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
+  const formatDuration = (departureStr: string, arrivalStr: string) => {
+    const dep = new Date(departureStr)
+    const arr = new Date(arrivalStr)
+    const diffMs = arr.getTime() - dep.getTime()
+    if (diffMs <= 0) return '-'
+    const diffMins = Math.floor(diffMs / 60000)
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
     return `${hours}h ${mins}m`
+  }
+
+  const getFlightPrice = (seatClass: string) => {
+    switch(seatClass.toLowerCase()) {
+      case 'first class': return 2500000;
+      case 'business': return 1500000;
+      default: return 800000;
+    }
   }
 
   return (
@@ -366,7 +369,7 @@ const Flights = () => {
             <label className="flex-spaceBetween">
               Depart
               <span className="return-check">
-                Return <input type="checkbox" checked={isReturn} onChange={e => setIsReturn(e.target.checked)}/>
+                Return <input type="checkbox" />
               </span>
             </label>
             <div className="input-with-icon">
@@ -385,7 +388,7 @@ const Flights = () => {
             <label>Passengers</label>
             <div className="input-with-icon">
               <span>👤</span>
-              <select value={passengers} onChange={e => setPassengers(e.target.value)}>
+              <select>
                 <option value="1 adult">1 adult</option>
                 <option value="2 adult">2 adult</option>
                 <option value="3 adult">3 adult</option>
@@ -397,7 +400,7 @@ const Flights = () => {
             <label>Class</label>
             <div className="input-with-icon">
               <span>✈️</span>
-              <select value={seatClass} onChange={e => setSeatClass(e.target.value)}>
+              <select>
                 <option value="Economy">Economy</option>
                 <option value="Business">Business</option>
                 <option value="First Class">First Class</option>
@@ -426,44 +429,27 @@ const Flights = () => {
       
       <section className="main-content-grid" style={{marginTop: error ? '16px' : '24px'}}>
         
-        {/* Left Col: Filters */}
-        <aside className="filters-sidebar">
-          <div className="filter-header">
-            <h3>Filter</h3>
-            <button className="btn-reset-filters" type="button" onClick={() => loadSchedules(0)}>Reset</button>
-          </div>
-
-          <div className="filter-group">
-            <h4>Price Range <span className="chevron">⌄</span></h4>
-            <div className="price-inputs">
-              <input type="text" placeholder="$0,00" value="$290,00" readOnly/>
-              <input type="text" placeholder="$0,00" value="$1200,00" readOnly/>
-            </div>
-          </div>
-
-          <div className="filter-group">
-            <h4>Airlines <span className="chevron">⌄</span></h4>
-            <label className="checkbox-label"><span>All</span> <input type="checkbox" /></label>
-            <label className="checkbox-label"><span>Garuda Indonesia</span> <input type="checkbox" defaultChecked /></label>
-            <label className="checkbox-label"><span>Citilink</span> <input type="checkbox" /></label>
-            <label className="checkbox-label"><span>Batik Air</span> <input type="checkbox" /></label>
-          </div>
-
-          <div className="filter-group">
-            <h4>Departure <span className="chevron">⌄</span></h4>
-            <label className="checkbox-label"><span>All</span> <input type="checkbox" defaultChecked/></label>
-            <label className="checkbox-label"><span>07.00 - 12.00</span> <input type="checkbox" /></label>
-            <label className="checkbox-label"><span>12.00 - 19.00</span> <input type="checkbox" /></label>
-            <label className="checkbox-label"><span>19.00 - 24.00</span> <input type="checkbox" /></label>
-          </div>
-
-          <div className="filter-group">
-            <h4>Transit <span className="chevron">⌄</span></h4>
-            <label className="checkbox-label"><span>Direct</span> <input type="checkbox" defaultChecked/></label>
-            <label className="checkbox-label"><span>1 Transit</span> <input type="checkbox" /></label>
-            <label className="checkbox-label"><span>2+ Transits</span> <input type="checkbox" /></label>
-          </div>
-        </aside>
+        <FilterSidebar 
+          filters={filters}
+          onFilterChange={(groupId, value, checked) => {
+            setFilters(prev => {
+              const groupFilters = prev[groupId] || []
+              if (checked) return { ...prev, [groupId]: [...groupFilters, value] }
+              return { ...prev, [groupId]: groupFilters.filter(v => v !== value) }
+            })
+          }}
+          onReset={() => { setFilters({}); loadSchedules(0) }}
+          groups={[
+            {
+              id: 'class', title: 'Class', type: 'checkbox',
+              options: [
+                { label: 'Economy', value: 'Economy' },
+                { label: 'Business', value: 'Business' },
+                { label: 'First Class', value: 'First Class' }
+              ]
+            }
+          ]}
+        />
 
         {/* Mid Col: Results */}
         <div className="results-container">
@@ -472,24 +458,16 @@ const Flights = () => {
               <h2 style={{fontSize: '1.25rem', marginBottom: '4px'}}>Select Outbound Flight <span style={{fontSize: '0.9rem', color: '#9ca3af', fontWeight: 400}}>( The best Flight found at the best prices )</span></h2>
             </div>
             <div className="results-actions">
-              <span className="sort-text">Sort =</span>
-              <span className="view-toggle">
-                <span className="icon">㗊</span>
-                <span className="icon active">≣</span>
-              </span>
+              <button className="btn-secondary" onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} style={{ padding: '4px 12px', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}>
+                Sort Price {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
             </div>
           </div>
 
-          <div className="date-carousel">
-            <button className="nav-btn">&lt;</button>
-            {dateCarousel.map((d, i) => (
-              <div key={i} className={`date-tab ${i === 0 ? 'active' : ''}`} onClick={() => setSearchParams(p => ({...p, date: d.iso}))}>
-                <span className="date">{d.dateStr}</span>
-                <span className="day">{d.dayStr}</span>
-              </div>
-            ))}
-            <button className="nav-btn">&gt;</button>
-          </div>
+          <DateCarousel 
+            baseDate={searchParams.date} 
+            onDateChange={(newDate) => setSearchParams(p => ({...p, date: newDate}))} 
+          />
 
           {loading ? (
             <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
@@ -499,68 +477,71 @@ const Flights = () => {
             <div style={{padding: '24px', textAlign: 'center'}}>No flights available.</div>
           ) : null}
 
-          <div className="flight-list">
-            {flights.map(flight => {
-              const depDate = new Date(flight.departureTime);
-              const arrDate = new Date(flight.arrivalTime);
-              // Pick fastest fare price to show
-              const lowestFare = flight.fares?.length > 0 ? flight.fares[0] : { basePrice: 0, currency: 'IDR' };
+          <div className="train-list">
+            {(() => {
+              let displayedFlights = flights
               
-              return (
-                <div className="flight-row-card" key={flight.id}>
-                  <div className="row-card-top">
-                    <div className="route-info">
-                      <span className="origin">{flight.originAirportName}</span>
-                      <span className="arrow">→</span>
-                      <span className="dest">{flight.destinationAirportName}</span>
-                    </div>
-                    <div className="rating">
-                      <span className="star">★</span> 4.8 <span className="bookmark">🔖</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flight-class-label">
-                    {flight.airlineName} {flight.flightNumber} - {flight.fares?.[0]?.seatClass || 'Economy'} class
-                  </div>
+              if (filters.class && filters.class.length > 0) {
+                displayedFlights = displayedFlights.filter(t => t.availableSeats?.some(s => filters.class.includes(s.seatClass || '')))
+              }
+              
+              displayedFlights.sort((a, b) => {
+                const aPrice = getFlightPrice(a.availableSeats?.[0]?.seatClass || 'Economy')
+                const bPrice = getFlightPrice(b.availableSeats?.[0]?.seatClass || 'Economy')
+                return sortOrder === 'asc' ? aPrice - bPrice : bPrice - aPrice
+              })
 
-                  <div className="timeline-row">
-                    <div className="time-block">
-                      <div className="time">{depDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                      <div className="station-code">❖ {flight.originAirportCode} - Airport</div>
-                    </div>
-                    
-                    <div className="duration-track">
-                      <div className="line">
-                        <span className="flight-icon-mid">✈️</span>
+              if (displayedFlights.length === 0 && !loading) {
+                return <div style={{padding: '24px', textAlign: 'center'}}>No matching flights.</div>
+              }
+
+              return displayedFlights.map(flight => {
+                const depDate = new Date(flight.departureTime);
+                const arrDate = new Date(flight.arrivalTime);
+                
+                return (
+                  <div className="train-row-card" key={flight.id}>
+                    <div className="row-card-top">
+                      <div className="route-info">
+                        <span className="origin">{flight.originAirportName || flight.originCity}</span>
+                        <span className="arrow">✈</span>
+                        <span className="destination">{flight.destinationAirportName || flight.destinationCity}</span>
                       </div>
-                      <div className="duration-text">Estimate: {formatDurationFriendly(flight.durationMinutes)}</div>
-                    </div>
-
-                    <div className="time-block right-align">
-                      <div className="time">{arrDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                      <div className="station-code">{flight.destinationAirportCode} - Airport ❖</div>
-                    </div>
-                  </div>
-
-                  <div className="row-card-bottom">
-                    <div className="facilities">
-                      <p>Fasilities</p>
-                      <div className="tags">
-                        <span>🧳 20KG</span>
-                        <span>🍔 Food</span>
-                        <span>📺 Entert.</span>
-                        <span>🔌 USB Port</span>
+                      <div className="times">
+                        <span className="time-block">
+                          <strong>{depDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong>
+                          <small>{depDate.toLocaleDateString()}</small>
+                        </span>
+                        <span className="duration">
+                          {formatDuration(flight.departureTime, flight.arrivalTime)}
+                        </span>
+                        <span className="time-block">
+                          <strong>{arrDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong>
+                          <small>{arrDate.toLocaleDateString()}</small>
+                        </span>
                       </div>
                     </div>
-                    <div className="price-action">
-                      <div className="price-text"><span>{lowestFare.currency} {lowestFare.basePrice}</span> / Person</div>
-                      <button className="btn-buy-now" onClick={() => handleBookNow(flight)}>Buy Now</button>
+                    <div className="row-card-bottom">
+                      <div className="train-details">
+                        <div className="train-name">{flight.airlineName} {flight.flightNumber}</div>
+                        <div className="train-class">{flight.availableSeats?.[0]?.seatClass || 'Economy'}</div>
+                        <div className="train-facilities">
+                          <span>🍽️ Meal</span>
+                          <span>📶 WiFi</span>
+                          <span>🧳 Baggage</span>
+                        </div>
+                      </div>
+                      <div className="price-action">
+                        <div className="price-text"><span>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(getFlightPrice(flight.availableSeats?.[0]?.seatClass || 'Economy'))}</span> / Person</div>
+                        <button className="btn-buy-now" onClick={() => handleBookNow(flight)}>Buy Now</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            })()}
           </div>
+          <PaginationControls pageMeta={pageMeta} onPageChange={loadSchedules} />
         </div>
 
         {/* Right Col: Promos & Stats */}
@@ -619,29 +600,24 @@ const Flights = () => {
       </section>
 
       {/* Booking Modal */}
-      {showBookingModal && selectedFlight && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Book Flight</h2>
-              <button className="modal-close" onClick={handleCloseModal}>×</button>
+      {selectedFlight && (
+        <BookingModal isOpen={showBookingModal} title="Book Flight" onClose={handleCloseModal}>
+          <>
+            <div className="booking-summary">
+              <h3>{selectedFlight.airlineName}</h3>
+              <p className="flight-route">{selectedFlight.originAirportName || selectedFlight.originCity} → {selectedFlight.destinationAirportName || selectedFlight.destinationCity}</p>
+              <p className="flight-time">{new Date(selectedFlight.departureTime).toLocaleString?.() ?? ''}</p>
             </div>
-            <div className="modal-body">
-              <div className="booking-summary">
-                <h3>{selectedFlight.airlineName}</h3>
-                <p className="flight-route">{selectedFlight.originAirportName} → {selectedFlight.destinationAirportName}</p>
-                <p className="flight-time">{new Date(selectedFlight.departureTime).toLocaleString?.() ?? ''}</p>
-              </div>
-              {bookingError && <div className="alert-error" role="alert"><span className="alert-icon">⚠️</span>{bookingError}</div>}
-              <div className="booking-form">
-                <div className="form-group">
-                  <label>Seat Class</label>
-                  <select value={bookingForm.seatClass} onChange={(e) => handleBookingFormChange('seatClass', e.target.value)} required>
-                    <option value="">Select seat class</option>
-                    {selectedFlight.fares?.map((f) => (
-                      <option key={f.seatClass} value={f.seatClass}>{f.seatClass} - {f.currency} {f.basePrice}</option>
-                    ))}
-                  </select>
+            {bookingError && <div className="error-message" role="alert">{bookingError}</div>}
+            <div className="booking-form">
+              <div className="form-group">
+                <label>Seat Class</label>
+                <select value={bookingForm.seatClass} onChange={(e) => handleBookingFormChange('seatClass', e.target.value)} required>
+                  <option value="">Select seat class</option>
+                  {selectedFlight.availableSeats?.map((s) => (
+                    <option key={s.seatClass} value={s.seatClass}>{s.seatClass} - {s.availableCount} available</option>
+                  ))}
+                </select>
                   {bookingForm.seatClass && seatsAllocationLoading && (
                     <p className="text-muted" style={{ marginTop: 8, fontSize: '0.875rem' }}>Assigning seats…</p>
                   )}
@@ -686,8 +662,7 @@ const Flights = () => {
                   </div>
                 )}
               </div>
-            </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="btn-cancel" onClick={handleCloseModal} disabled={bookingLoading}>Cancel</button>
               <button
                 className="btn-submit"
@@ -703,8 +678,8 @@ const Flights = () => {
                 {bookingLoading ? 'Processing...' : 'Confirm Booking'}
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        </BookingModal>
       )}
     </div>
   )

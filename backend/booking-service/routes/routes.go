@@ -58,8 +58,9 @@ func SetupRoutes(
 		protected.POST("/:id/cancel", bookingHandler.CancelBooking)
 	}
 
-	// Internal route — no auth required (called by payment-service)
+	// Internal route — requires internal api key (called by payment-service)
 	internal := router.Group("/bookings")
+	internal.Use(middleware.InternalAuthMiddleware())
 	{
 		internal.POST("/:id/confirm", bookingHandler.ConfirmBooking)
 	}

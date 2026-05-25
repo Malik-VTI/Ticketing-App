@@ -18,7 +18,7 @@ services:
   # API Gateway
   api-gateway:
     build:
-      context: ./api-gateaway
+      context: ./api-gateway
       dockerfile: Dockerfile
     container_name: ticketing-api-gateway
     ports:
