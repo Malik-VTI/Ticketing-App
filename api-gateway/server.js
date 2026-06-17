@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config/config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const logger = require('./utils/logger');
 
 const app = express();
 
@@ -53,13 +54,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request logging middleware (development)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    next();
+// Request logging middleware (structured, all environments).
+// Logs each request when its response finishes. No request/correlation IDs
+// are added here — Dynatrace OneAgent handles trace correlation.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({ method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - start }, 'request');
   });
-}
+  next();
+});
 
 // API routes
 app.use('/api', routes);
@@ -94,20 +98,23 @@ const PORT = config.server.port;
 const HOST = config.server.host;
 
 app.listen(PORT, HOST, () => {
-  console.log(`=================================`);
-  console.log(`API Gateway Server`);
-  console.log(`=================================`);
-  console.log(`Server running on http://${HOST}:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Services configured:`);
-  console.log(`  - Auth: ${config.services.auth.baseUrl}`);
-  console.log(`  - Booking: ${config.services.booking.baseUrl}`);
-  console.log(`  - Payment: ${config.services.payment.baseUrl}`);
-  console.log(`  - Flights: ${config.services.flight.baseUrl}`);
-  console.log(`  - Train: ${config.services.train.baseUrl}`);
-  console.log(`  - Hotel: ${config.services.hotel.baseUrl}`);
-  console.log(`  - Pricing: ${config.services.pricing.baseUrl}`);
-  console.log(`=================================`);
+  logger.info(
+    {
+      port: PORT,
+      host: HOST,
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        auth: config.services.auth.baseUrl,
+        booking: config.services.booking.baseUrl,
+        payment: config.services.payment.baseUrl,
+        flight: config.services.flight.baseUrl,
+        train: config.services.train.baseUrl,
+        hotel: config.services.hotel.baseUrl,
+        pricing: config.services.pricing.baseUrl,
+      },
+    },
+    'API Gateway started'
+  );
 });
 
 module.exports = app;

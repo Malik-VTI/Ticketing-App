@@ -1,10 +1,11 @@
 require('dotenv').config({ path: '../../.env' });
+const logger = require('../utils/logger');
 
 const gatewayPort = process.env.API_GATEWAY_PORT;
 const port = process.env.PORT || (gatewayPort && !gatewayPort.startsWith('tcp') ? gatewayPort : 3000);
 
 if (!process.env.JWT_SECRET_KEY) {
-  console.error('FATAL ERROR: JWT_SECRET_KEY is not defined in environment variables.');
+  logger.error('FATAL ERROR: JWT_SECRET_KEY is not defined in environment variables.');
   process.exit(1);
 }
 

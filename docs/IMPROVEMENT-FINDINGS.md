@@ -164,13 +164,13 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Lokasi:** Go (`log.Printf`), Node (`console.log`, hanya saat `NODE_ENV=development`), Java (slf4j parsial)
 - **Masalah:** Mustahil melacak 1 request lintas service.
 - **Rekomendasi:** Structured logging JSON (Go: `zerolog`/`slog`; Node: `pino`), inject `X-Request-ID`/correlation ID di gateway dan teruskan ke semua service.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — structured JSON logging di semua service: **Go** (5) pakai `log/slog` (JSON handler default; `slog.SetDefault` otomatis mengalihkan semua `log.Printf` lama → JSON, tanpa ubah call site; level via `LOG_LEVEL`); **Java** (5) `logstash-logback-encoder` + `logback-spring.xml` (LogstashEncoder sertakan MDC); **Node** gateway `pino` + request-log terstruktur (method/path/status/durationMs). **Sengaja TIDAK menambahkan correlation/trace ID di kode** (per keputusan: Dynatrace OneAgent yang akan enrich log↔trace otomatis; encoder Java sertakan MDC supaya `dt.trace_id`/`dt.span_id` muncul sendiri). Build go/node/mvn verified.
 
 ### `OBS-02` — Tidak ada metrics & distributed tracing
 - **Severity:** Medium
 - **Masalah:** Tidak ada Prometheus/ServiceMonitor, tidak ada OpenTelemetry/Jaeger. (Ada `external-monitoring.yaml` Dynatrace tapi belum di-commit/aktif.)
 - **Rekomendasi:** Expose `/metrics` (Prometheus) + OpenTelemetry tracing; finalize setup Dynatrace bila itu pilihannya.
-- **Status:** `[ ]`
+- **Status:** `[—]` TIDAK DIKERJAKAN (by decision, 2026-06-17) — metrics & distributed tracing ditangani **Dynatrace OneAgent** yang sudah terpasang di cluster Kubernetes. Tidak perlu instrumentasi manual (Prometheus/OTel) di kode. OBS-01 sengaja menghasilkan JSON log polos agar OneAgent yang meng-korelasi log↔trace.
 
 ### `DOC-01` — Tidak ada API documentation (Swagger/OpenAPI)
 - **Severity:** Medium
@@ -182,12 +182,12 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Severity:** Low-Medium
 - **Masalah:** Tidak ada `golangci-lint`, checkstyle, atau eslint config di root (hanya TS strict di frontend).
 - **Rekomendasi:** Tambah `golangci-lint`, eslint+prettier gateway, checkstyle/spotless Java; jalankan di CI.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `.golangci.yml` (root), `eslint.config.js`+`.prettierrc.json`+devDeps+scripts di gateway, `spotless-maven-plugin` di 5 pom Java (tanpa bind ke build → tidak memecah `mvn compile`), `.editorconfig` root. Config-only (tidak mereformat kode). Belum diwire ke CI (langkah lanjutan).
 
 ### `DOC-03` — README per-service tidak konsisten
 - **Severity:** Low
 - **Fakta:** Hanya 4 dari 10 service punya README (auth, pricing, flight, train). Belum ada: booking, payment, profile, admin, hotel, notification, frontend.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — README dibuat untuk booking, payment, notification, profile, admin, hotel; `frontend/README.md` lama yang usang diperbarui agar akurat. Semua diverifikasi terhadap kode nyata (mis. admin-service ternyata agregasi metrics via SQL langsung, bukan REST antar-service — didokumentasikan apa adanya).
 
 ---
 

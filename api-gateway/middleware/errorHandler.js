@@ -1,8 +1,10 @@
+const logger = require('../utils/logger');
+
 /**
  * Global Error Handler Middleware
  */
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error({ err }, 'Error');
 
   // Default error
   const status = err.status || 500;
