@@ -198,53 +198,53 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Lokasi:** `03-authentication`, `05-flight`, `06-train`, `09-notification`, `14-hotel` (semua `:latest` + `IfNotPresent`)
 - **Masalah:** Kombinasi ini → node tidak akan pull image baru meski sudah di-push ulang.
 - **Rekomendasi:** Konsisten pakai versioned tag + `imagePullPolicy: Always` (seperti booking/api-gateway/frontend/payment yang sudah benar).
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `imagePullPolicy: Always` diset pada 5 deployment `:latest` (03, 05, 06, 09, 14). Tagging versioned penuh dari sisi CI ditangani DEVOPS-06 (push `:${BUILD_NUMBER}` + `:latest`).
 
 ### `DEVOPS-02` — Tidak ada `securityContext` / `runAsNonRoot`
 - **Severity:** High (terverifikasi — tidak ada satupun di `deployments/`)
 - **Rekomendasi:** Tambah `runAsNonRoot: true`, `runAsUser: 1000`, `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — securityContext (pod: `runAsNonRoot: true` + seccomp RuntimeDefault; container: `allowPrivilegeEscalation: false` + drop ALL caps) di **12 deployment**. Tanpa `runAsUser` (image yang sediakan user non-root, lihat DEVOPS-05) & tanpa `readOnlyRootFilesystem` (berisiko app menulis /tmp). ⚠️ **Urutan apply**: image non-root (DEVOPS-05) harus di-build & push DULU; apply securityContext sebelum itu akan crashloop (fail-fast).
 
 ### `DEVOPS-03` — `payment-service` replicas: 1 (SPOF)
 - **Severity:** High (terverifikasi)
 - **Lokasi:** `deployments/15-payment-service.yaml:9`
 - **Rekomendasi:** Minimal 2 replica untuk service pembayaran.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `15-payment-service.yaml` replicas `1` → `2`. (Akan dikelola HPA, lihat DEVOPS-04.)
 
 ### `DEVOPS-04` — Tidak ada HPA (autoscaling)
 - **Severity:** Medium (terverifikasi — tidak ada `HorizontalPodAutoscaler`)
 - **Rekomendasi:** HPA untuk gateway & service kritis (target CPU ~70%, min 2 / max 5).
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `deployments/16-hpa.yaml` baru: HPA (`autoscaling/v2`, CPU 70%, min 2 / max 5) untuk api-gateway, booking, payment, flight, train. (Butuh metrics-server di cluster agar aktif; bila tak ada, tidak merusak — hanya tak scaling.)
 
 ### `DEVOPS-05` — Base image Go `alpine:latest` & tanpa `.dockerignore`
 - **Severity:** Medium
 - **Rekomendasi:** Pin versi (`alpine:3.20`); tambah `.dockerignore` (`.git`, `node_modules`, `.env`, `target/`, dll) di tiap service; jalankan container Go sebagai non-root user.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — 11 Dockerfile (5 Go, 5 Java, gateway) + frontend: base image dipin (Go `alpine:3.20`, Java `temurin:17.0.13_11-jre-alpine`, node `20.18-alpine`, frontend `nginxinc/nginx-unprivileged:1.27-alpine`), user **non-root** (Go/Java uid 1000, gateway `node`, frontend uid 101), `.dockerignore` di tiap context. Diverifikasi via `docker build` (uid 1000/101).
 
 ### `DEVOPS-06` — Jenkinsfile tanpa stage test & security scan, push `:latest`
 - **Severity:** Medium
 - **Lokasi:** `Jenkinsfile`
 - **Rekomendasi:** Tambah stage unit test + image scan (Trivy); tag image pakai `BUILD_NUMBER`/git sha, bukan `:latest`.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — Jenkinsfile: stage **Test** (go/mvn/npm per stack, `catchError`→UNSTABLE bila tool absen), stage **Security Scan** (Trivy HIGH/CRITICAL, non-gating), dan tagging ganda `:${BUILD_NUMBER}` + `:latest` (latest dipertahankan agar referensi lama tak putus). Aditif (stage lama utuh). Belum bisa di-run (tak ada Jenkins di env) — sintaks tervalidasi.
 
 ### `DEVOPS-07` — Ingress: tanpa TLS, annotation deprecated
 - **Severity:** Medium
 - **Lokasi:** `deployments/13-ingress.yaml`
 - **Rekomendasi:** Tambah TLS (cert-manager), gunakan `ingressClassName` (bukan annotation lama), tambah rate-limit annotation.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `13-ingress.yaml`: annotation usang `kubernetes.io/ingress.class` → field `ingressClassName: nginx`; ditambah `spec.tls` (host `ticketing-app.local` → secret `ticketing-tls`) + annotation `cert-manager.io/cluster-issuer: letsencrypt-prod`. Rules HTTP dipertahankan. ⚠️ Butuh cert-manager + ClusterIssuer; bila belum ada, HTTP tetap jalan & TLS aktif setelah cert tersedia.
 
 ### `DEVOPS-08` — nginx frontend kurang security header
 - **Severity:** Low-Medium
 - **Lokasi:** `frontend/nginx.conf`
 - **Masalah:** Belum ada CSP, HSTS, Referrer-Policy, Permissions-Policy (X-XSS-Protection sudah deprecated).
 - **Rekomendasi:** Tambah header tsb (sesuaikan CSP dengan script Dynatrace RUM).
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `frontend/nginx.conf`: ditambah `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`. CSP diset **Report-Only** (`Content-Security-Policy-Report-Only`) supaya TIDAK memblokir script RUM yang di-inject Dynatrace OneAgent — bisa dipromosikan ke enforcing setelah pelanggaran ditinjau.
 
 ### `HYGIENE-01` — Clutter di working directory
 - **Severity:** Low
 - **Item:** `frontend.tar` (62MB), `images.tar` (466MB), `patch.json`/`patch2.json`/`patch3.json`, `scratch/`, plus `external-monitoring.yaml` & `clusterrole-fix.yaml` (Dynatrace) yang belum di-commit.
 - **Rekomendasi:** Hapus artifact besar; pindahkan manifest monitoring ke `deployments/monitoring/` lalu commit; tambah `patch*.json` & `scratch/` ke `.gitignore`.
-- **Status:** `[ ]`
+- **Status:** `[~]` SEBAGIAN (2026-06-17) — `.gitignore` ditambah `scratch/` & `patch*.json` (`*.tar` sudah diabaikan sebelumnya). **Belum (perlu keputusan Anda):** menghapus artifact besar (`frontend.tar` 62MB, `images.tar` 466MB — tidak saya hapus, destruktif) & memindahkan manifest Dynatrace (`external-monitoring.yaml`, `clusterrole-fix.yaml`) ke `deployments/monitoring/` (dibiarkan karena terkait setup Dynatrace Anda).
 
 ---
 
