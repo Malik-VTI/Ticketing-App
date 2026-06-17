@@ -182,12 +182,12 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Severity:** Low-Medium
 - **Masalah:** Tidak ada `golangci-lint`, checkstyle, atau eslint config di root (hanya TS strict di frontend).
 - **Rekomendasi:** Tambah `golangci-lint`, eslint+prettier gateway, checkstyle/spotless Java; jalankan di CI.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — `.golangci.yml` (root), `eslint.config.js`+`.prettierrc.json`+devDeps+scripts di gateway, `spotless-maven-plugin` di 5 pom Java (tanpa bind ke build → tidak memecah `mvn compile`), `.editorconfig` root. Config-only (tidak mereformat kode). Belum diwire ke CI (langkah lanjutan).
 
 ### `DOC-03` — README per-service tidak konsisten
 - **Severity:** Low
 - **Fakta:** Hanya 4 dari 10 service punya README (auth, pricing, flight, train). Belum ada: booking, payment, profile, admin, hotel, notification, frontend.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — README dibuat untuk booking, payment, notification, profile, admin, hotel; `frontend/README.md` lama yang usang diperbarui agar akurat. Semua diverifikasi terhadap kode nyata (mis. admin-service ternyata agregasi metrics via SQL langsung, bukan REST antar-service — didokumentasikan apa adanya).
 
 ---
 
