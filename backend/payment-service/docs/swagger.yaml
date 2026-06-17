@@ -1,0 +1,198 @@
+basePath: /
+definitions:
+  models.CreatePaymentRequest:
+    properties:
+      amount:
+        minimum: 0
+        type: number
+      booking_id:
+        type: string
+      currency:
+        type: string
+      payment_method:
+        allOf:
+        - $ref: '#/definitions/models.PaymentMethod'
+        enum:
+        - bank_transfer
+        - ewallet
+        - credit_card
+    required:
+    - amount
+    - booking_id
+    - payment_method
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.PaymentDTO:
+    properties:
+      amount:
+        type: number
+      booking_id:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      payment_method:
+        $ref: '#/definitions/models.PaymentMethod'
+      status:
+        $ref: '#/definitions/models.PaymentStatus'
+      user_id:
+        type: string
+    type: object
+  models.PaymentMethod:
+    enum:
+    - bank_transfer
+    - ewallet
+    - credit_card
+    type: string
+    x-enum-varnames:
+    - MethodBankTransfer
+    - MethodEWallet
+    - MethodCreditCard
+  models.PaymentStatus:
+    enum:
+    - initiated
+    - succeeded
+    - failed
+    - refunded
+    type: string
+    x-enum-varnames:
+    - StatusInitiated
+    - StatusSucceeded
+    - StatusFailed
+    - StatusRefunded
+info:
+  contact: {}
+  description: Payment service (Gin) — payment creation, lookup, and refunds.
+  title: Payment Service API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Shallow liveness probe. Does not depend on the database.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness health check
+      tags:
+      - health
+  /payments:
+    post:
+      consumes:
+      - application/json
+      description: Creates a payment for a booking on behalf of the authenticated
+        user.
+      parameters:
+      - description: Payment to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreatePaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.PaymentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a payment
+      tags:
+      - payments
+  /payments/{id}:
+    get:
+      description: Returns a single payment by its ID.
+      parameters:
+      - description: Payment ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaymentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get a payment by ID
+      tags:
+      - payments
+  /payments/{id}/refund:
+    post:
+      description: Refunds a succeeded payment owned by the authenticated user.
+      parameters:
+      - description: Payment ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaymentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Refund a payment
+      tags:
+      - payments
+swagger: "2.0"

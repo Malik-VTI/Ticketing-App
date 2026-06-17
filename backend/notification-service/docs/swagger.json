@@ -1,0 +1,134 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Notification service that sends booking and payment email notifications. The /notifications/send endpoint is invoked service-to-service by the booking and payment services.",
+        "title": "Notification Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/send": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Queue an email notification (service-to-service)",
+                "parameters": [
+                    {
+                        "description": "Notification payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/notification-service_internal_models.SendNotificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/notification-service_internal_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "notification-service_internal_models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "notification-service_internal_models.NotificationType": {
+            "type": "string",
+            "enum": [
+                "booking_confirmation",
+                "payment_confirmation",
+                "booking_cancelled"
+            ],
+            "x-enum-varnames": [
+                "TypeBookingConfirmation",
+                "TypePaymentConfirmation",
+                "TypeBookingCancelled"
+            ]
+        },
+        "notification-service_internal_models.SendNotificationRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "type",
+                "user_id"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "booking_id": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/notification-service_internal_models.NotificationType"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

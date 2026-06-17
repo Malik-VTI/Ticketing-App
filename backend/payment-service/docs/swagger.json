@@ -1,0 +1,295 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Payment service (Gin) — payment creation, lookup, and refunds.",
+        "title": "Payment Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Shallow liveness probe. Does not depend on the database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/payments": {
+            "post": {
+                "description": "Creates a payment for a booking on behalf of the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Create a payment",
+                "parameters": [
+                    {
+                        "description": "Payment to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreatePaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaymentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/payments/{id}": {
+            "get": {
+                "description": "Returns a single payment by its ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Get a payment by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Payment ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaymentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/payments/{id}/refund": {
+            "post": {
+                "description": "Refunds a succeeded payment owned by the authenticated user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Refund a payment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Payment ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaymentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.CreatePaymentRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "booking_id",
+                "payment_method"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "booking_id": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "enum": [
+                        "bank_transfer",
+                        "ewallet",
+                        "credit_card"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.PaymentMethod"
+                        }
+                    ]
+                }
+            }
+        },
+        "models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PaymentDTO": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "booking_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "$ref": "#/definitions/models.PaymentMethod"
+                },
+                "status": {
+                    "$ref": "#/definitions/models.PaymentStatus"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PaymentMethod": {
+            "type": "string",
+            "enum": [
+                "bank_transfer",
+                "ewallet",
+                "credit_card"
+            ],
+            "x-enum-varnames": [
+                "MethodBankTransfer",
+                "MethodEWallet",
+                "MethodCreditCard"
+            ]
+        },
+        "models.PaymentStatus": {
+            "type": "string",
+            "enum": [
+                "initiated",
+                "succeeded",
+                "failed",
+                "refunded"
+            ],
+            "x-enum-varnames": [
+                "StatusInitiated",
+                "StatusSucceeded",
+                "StatusFailed",
+                "StatusRefunded"
+            ]
+        }
+    }
+}

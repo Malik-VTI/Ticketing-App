@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const swaggerUi = require('swagger-ui-express');
 const config = require('./config/config');
 const routes = require('./routes');
+const openapiSpec = require('./openapi');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
@@ -64,6 +66,16 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// API documentation (DOC-01) — interactive Swagger UI + raw OpenAPI JSON.
+// Mounted after security headers/logging but before the 404 handler so it is
+// reachable. The raw JSON is also exposed for tooling/clients that don't need the UI.
+app.get('/api/docs.json', (req, res) => {
+  res.json(openapiSpec);
+});
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
+  customSiteTitle: 'Ticketing App API Gateway — Docs',
+}));
 
 // API routes
 app.use('/api', routes);

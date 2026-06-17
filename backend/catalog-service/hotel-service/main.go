@@ -21,6 +21,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// @title Hotel Service API
+// @version 1.0
+// @description Hotel catalog service exposing hotel search, room availability, rates, and room reservation/release operations for the ticketing platform.
+// @BasePath /
 func main() {
 	// Configure structured (JSON) logging as the default logger.
 	logLevel := slog.LevelInfo

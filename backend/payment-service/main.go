@@ -21,6 +21,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// @title Payment Service API
+// @version 1.0
+// @description Payment service (Gin) — payment creation, lookup, and refunds.
+// @BasePath /
 func main() {
 	// Configure structured (JSON) logging as the default logger.
 	logLevel := slog.LevelInfo

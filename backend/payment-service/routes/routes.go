@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"payment-service/database"
+	_ "payment-service/docs"
 	"payment-service/handlers"
 	"payment-service/middleware"
 	"payment-service/repository"
 	"payment-service/service"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRoutes(paymentRepo repository.PaymentRepository) *gin.Engine {
@@ -38,6 +41,9 @@ func SetupRoutes(paymentRepo repository.PaymentRepository) *gin.Engine {
 
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	handler := handlers.NewPaymentHandler(paymentSvc)
+
+	// Swagger UI (DOC-01)
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Health (liveness — shallow)
 	router.GET("/health", handler.Health)

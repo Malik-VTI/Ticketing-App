@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"authentication-service/config"
 	"authentication-service/database"
+	_ "authentication-service/docs"
 	"authentication-service/handlers"
 	"authentication-service/middleware"
 	"authentication-service/repository"
@@ -34,6 +37,9 @@ func SetupRoutes(cfg *config.Config, userRepo repository.UserRepository) *gin.En
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
+
+	// Swagger documentation endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Auth handler
 	authHandler := handlers.NewAuthHandler(userRepo, cfg)

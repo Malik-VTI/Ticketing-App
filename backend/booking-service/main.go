@@ -22,6 +22,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// @title Booking Service API
+// @version 1.0
+// @description Booking service (Gin) — bookings, seat lock, transactional outbox.
+// @BasePath /
 func main() {
 	// Configure structured (JSON) logging as the default logger.
 	logLevel := slog.LevelInfo

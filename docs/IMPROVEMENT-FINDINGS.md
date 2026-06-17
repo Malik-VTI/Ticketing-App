@@ -63,7 +63,7 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Lokasi:** `deployments/01-secrets.yaml` (`DB_PASSWORD: "P@ssw0rd"`, `JWT_SECRET_KEY: ...`)
 - **Masalah:** Secret asli ada di git. Password DB juga lemah (`P@ssw0rd`).
 - **Rekomendasi:** Keluarkan dari git (template `01-secrets.example.yaml`), pakai Sealed Secrets / External Secrets Operator / Vault, dan **rotate** semua secret. Pertimbangkan `git filter-repo` untuk membersihkan history.
-- **Status:** `[~]` PAKET SIAP — arah dipilih: **Sealed Secrets** (2026-06-17). Disiapkan: `deployments/01-secrets.example.yaml` (template placeholder, aman commit), `deployments/sealed-secrets/README.md` (panduan 6 langkah), `deployments/sealed-secrets/seal.sh` (helper, syntax tervalidasi), entry `.gitignore` untuk plaintext `deployments/01-secrets.yaml`. **Sisa langkah manual (perlu cluster + rotasi oleh Anda):** install controller sealed-secrets + kubeseal CLI, rotate semua nilai, jalankan `seal.sh`, commit `01-sealed-secrets.yaml`, lalu `git rm --cached 01-secrets.yaml`. ⚠️ `INTERNAL_API_KEY` baru (dari fix SEC-02) & hardcoded `DB_PASSWORD`/IP default di `config.go` service lain (booking/payment/hotel) ikut tercakup saat rotasi.
+- **Status:** `[~]` ARAH DIUBAH (2026-06-17) — **Sealed Secrets DILEWATI** karena controller tidak bisa di-install di cluster. Gantinya: **buat Secret `ticketing-secrets` secara imperatif di cluster** (`kubectl create secret generic ... -n ticketing-app`) lalu **`git rm --cached deployments/01-secrets.yaml`** (sudah di-gitignore) agar plaintext tidak lagi di repo. Deployment pakai `secretRef`, jadi tetap jalan tanpa file secret di git. Scaffolding `deployments/sealed-secrets/` & `01-secrets.example.yaml` dipertahankan sebagai referensi/template (example tetap berguna untuk daftar key). **Sisa langkah manual Anda:** rotate nilai (DB_PASSWORD/JWT_SECRET_KEY/INTERNAL_API_KEY), buat secret di node, lalu untrack file plaintext. ⚠️ Hardcoded `DB_PASSWORD`/IP default di `config.go` service lain (booking/payment/hotel) ikut saat rotasi.
 
 ### `SEC-04` — `id_rsa` (private key) ada di working directory
 - **Severity:** High (tidak ter-commit, tapi key asli nongkrong di folder project)
@@ -157,7 +157,7 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
   - Frontend & API Gateway: **0 test** (`package.json` gateway: `"test": "echo Error ... && exit 1"`).
 - **Risiko:** Alur paling kritis (booking + payment) sama sekali tidak ter-cover.
 - **Rekomendasi:** Mulai dari unit test untuk service layer booking & payment; tambah integration test untuk alur end-to-end booking→payment→confirm. Target awal realistis ~50–60% di service kritis.
-- **Status:** `[ ]`
+- **Status:** `[~]` FONDASI SELESAI (2026-06-17) — unit test hermetik (real assertions) lintas stack, semua LULUS: **auth-service** (jwt + password, 9), **booking-service** (ref gen, outbox payload, DTO, 6), **payment-service** (simulasi bayar, DTO, 3), **pricing-service Java** (kalkulasi harga + kupon, 15 JUnit), **gateway** (validator di-extract ke `utils/validators.js` + 12 `node:test`). ⚠️ **Bug nyata ditemukan & DIPERBAIKI lewat test**: `generateBookingReference()` me-reseed RNG dari `time.Now()` tiap call → tabrakan `booking_reference` (UNIQUE) di bawah beban; diganti ke global `rand` (auto-seed, concurrency-safe) + test guard uniqueness tight-loop. **Belum**: integration/e2e test (booking→payment→confirm) & coverage service lain — perluasan bertahap.
 
 ### `OBS-01` — Logging tidak terstruktur & tanpa correlation/trace ID
 - **Severity:** Medium-High
@@ -176,7 +176,7 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Severity:** Medium
 - **Masalah:** Hanya README manual di ~40% service.
 - **Rekomendasi:** `springdoc-openapi` (Java), `swaggo` (Go); satukan via gateway.
-- **Status:** `[ ]`
+- **Status:** `[x]` SELESAI (2026-06-17) — **Java (5)**: `springdoc-openapi` 2.3.0 → Swagger UI di `/swagger-ui.html` + `/v3/api-docs` (izin Swagger ditambah di SecurityConfig yang relevan). **Go (5)**: `swaggo`/gin-swagger, anotasi handler + `swag init` → `docs/`, route `/swagger/index.html`. **Gateway**: `swagger-ui-express` + `openapi.js` (spec hand-written OpenAPI 3, 18 operasi publik) di `/api/docs` (smoke-test 200). Semua build/compile verified.
 
 ### `DOC-02` — Linting/formatting tidak dipaksakan
 - **Severity:** Low-Medium
