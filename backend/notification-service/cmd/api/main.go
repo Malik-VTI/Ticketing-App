@@ -43,9 +43,14 @@ func main() {
 
 	router := gin.Default()
 
+	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://ticketing-app.local"
+	}
+
 	// CORS
 	router.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
 		if c.Request.Method == "OPTIONS" {
@@ -56,6 +61,7 @@ func main() {
 	})
 
 	router.GET("/health", handler.Health)
+	router.GET("/health/ready", handler.Ready)
 
 	// Internal route — no auth required (service-to-service)
 	notifications := router.Group("/notifications")

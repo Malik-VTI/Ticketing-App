@@ -1,13 +1,10 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net/http"
-	"os"
 	"time"
 
 	"booking-service/cache"
@@ -27,12 +24,14 @@ type BookingService interface {
 	CancelBooking(id uuid.UUID) error
 	ExpireBooking(id uuid.UUID) error
 	StartExpirationWorker()
+	StartOutboxWorker()
 	UpdateBookingStatus(id uuid.UUID, status string) error
 }
 
 type bookingService struct {
 	bookingRepo     repository.BookingRepository
 	bookingItemRepo repository.BookingItemRepository
+	outboxRepo      repository.OutboxRepository
 	catalogClient   clients.CatalogClient
 	pricingClient   clients.PricingClient
 }
@@ -40,12 +39,14 @@ type bookingService struct {
 func NewBookingService(
 	bookingRepo repository.BookingRepository,
 	bookingItemRepo repository.BookingItemRepository,
+	outboxRepo repository.OutboxRepository,
 	catalogClient clients.CatalogClient,
 	pricingClient clients.PricingClient,
 ) BookingService {
 	return &bookingService{
 		bookingRepo:     bookingRepo,
 		bookingItemRepo: bookingItemRepo,
+		outboxRepo:      outboxRepo,
 		catalogClient:   catalogClient,
 		pricingClient:   pricingClient,
 	}
@@ -214,14 +215,27 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 		items = append(items, item)
 	}
 
-	// 7. Commit
+	// 7. Write the booking-created notification to the outbox INSIDE the same
+	// transaction (Transactional Outbox / ARCH-05). The event is committed
+	// atomically with the booking, so it can never be lost — a background worker
+	// (StartOutboxWorker) delivers it to the notification-service afterwards.
+	// We deliberately do NOT send the notification inline here to avoid
+	// duplicate delivery (worker + inline).
+	payloadJSON, err := buildBookingNotificationPayload(booking)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("failed to build notification payload: %w", err)
+	}
+	if err := s.outboxRepo.InsertOutboxTx(tx, uuid.New(), booking.ID, "booking.created", payloadJSON); err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("failed to enqueue notification outbox event: %w", err)
+	}
+
+	// 8. Commit (booking, items, and outbox event commit together — atomic)
 	if err := tx.Commit(); err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("failed to commit booking transaction: %w", err)
 	}
-
-	// 8. Notify notification service (fire-and-forget)
-	go s.sendBookingNotification(booking)
 
 	return s.toBookingDTO(booking, items), nil
 }
@@ -433,31 +447,22 @@ func generateBookingReference() string {
 	return fmt.Sprintf("BK-%s", string(b))
 }
 
-// sendBookingNotification fires a notification event to the notification service.
-// Called as a goroutine — errors are logged but never propagate to the caller.
-func (s *bookingService) sendBookingNotification(booking *models.Booking) {
-	notifURL := os.Getenv("NOTIFICATION_SERVICE_URL")
-	if notifURL == "" {
-		notifURL = "http://localhost:8087"
-	}
-
+// buildBookingNotificationPayload serializes the notification-service payload
+// for a freshly created booking. This is the SAME shape that used to be sent
+// inline by sendBookingNotification; it is now stored in the outbox and later
+// delivered verbatim by the outbox worker.
+func buildBookingNotificationPayload(booking *models.Booking) (string, error) {
 	payload := map[string]interface{}{
-		"type":      "booking_confirmation",
-		"user_id":   booking.UserID.String(),
-		"email":     "", // Populated by notification service lookup if needed
-		"reference": booking.BookingReference,
+		"type":       "booking_confirmation",
+		"user_id":    booking.UserID.String(),
+		"email":      "", // Populated by notification service lookup if needed
+		"reference":  booking.BookingReference,
 		"booking_id": booking.ID.String(),
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return
+		return "", err
 	}
-
-	resp, err := http.Post(notifURL+"/notifications/send", "application/json", bytes.NewReader(body))
-	if err != nil {
-		// Not critical — notification is best-effort
-		return
-	}
-	defer resp.Body.Close()
+	return string(body), nil
 }

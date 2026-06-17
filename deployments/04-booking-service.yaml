@@ -15,10 +15,12 @@ spec:
       labels:
         app: booking-service
     spec:
+      imagePullSecrets:
+      - name: dockerhub-credentials
       containers:
       - name: booking-service
-        image: malikvti/booking-service:latest
-        imagePullPolicy: IfNotPresent
+        image: malikvti/booking-service:1.0.2
+        imagePullPolicy: Always
         ports:
         - containerPort: 8082
           name: http
@@ -45,7 +47,7 @@ spec:
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /health/ready
             port: 8082
           initialDelaySeconds: 10
           periodSeconds: 5
