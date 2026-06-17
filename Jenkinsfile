@@ -27,6 +27,81 @@ pipeline {
             }
         }
 
+        // DEVOPS-06: Run unit tests per stack BEFORE building images so a broken
+        // build is caught early. This stage is best-effort: each stack is wrapped
+        // in catchError so a missing toolchain on the Jenkins agent (or a not-yet
+        // test-ready service) marks the stage UNSTABLE instead of failing the whole
+        // pipeline. Flip `buildResult`/`stageResult` to 'FAILURE' once a stack's
+        // tests are mandatory.
+        stage('Test') {
+            steps {
+                script {
+                    // Go services (modules with a real go.mod). Each dir is tested
+                    // independently so one failing module does not skip the others.
+                    def goServices = [
+                        'backend/authentication-service',
+                        'backend/booking-service',
+                        'backend/catalog-service/hotel-service',
+                        'backend/notification-service',
+                        'backend/payment-service'
+                    ]
+                    // Java / Spring Boot services (Maven). Uses the wrapper (./mvnw)
+                    // when present, otherwise falls back to a system `mvn`.
+                    def javaServices = [
+                        'backend/admin-service',
+                        'backend/catalog-service/flight-service',
+                        'backend/catalog-service/train-service',
+                        'backend/pricing-service',
+                        'backend/profile-service'
+                    ]
+
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Go tests failed or Go toolchain unavailable') {
+                        if (sh(script: 'command -v go >/dev/null 2>&1', returnStatus: true) != 0) {
+                            // Note: Go not installed on this agent; skip without failing.
+                            echo 'Go toolchain not found on agent; skipping Go tests. Install Go or use a Go-capable agent to enable.'
+                        } else {
+                            for (def dir : goServices) {
+                                echo "Running Go tests in ${dir}"
+                                sh "cd '${dir}' && go test ./..."
+                            }
+                        }
+                    }
+
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Java/Maven tests failed or Maven unavailable') {
+                        for (def dir : javaServices) {
+                            echo "Running Maven tests in ${dir}"
+                            // Prefer the project's Maven wrapper; fall back to system mvn.
+                            // `|| true` is intentionally NOT used here so a real test
+                            // failure surfaces — catchError keeps it non-fatal overall.
+                            sh """
+                                cd '${dir}'
+                                if [ -x ./mvnw ]; then
+                                    ./mvnw -q test
+                                elif command -v mvn >/dev/null 2>&1; then
+                                    mvn -q test
+                                else
+                                    echo 'No Maven wrapper or system mvn found; skipping ${dir}.'
+                                fi
+                            """
+                        }
+                    }
+
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Node gateway tests failed or npm unavailable') {
+                        if (sh(script: 'command -v npm >/dev/null 2>&1', returnStatus: true) != 0) {
+                            echo 'npm not found on agent; skipping Node gateway tests.'
+                        } else {
+                            echo 'Running Node tests in api-gateway'
+                            sh '''
+                                cd api-gateway
+                                npm ci || npm install
+                                npm test
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build & Push Images (Kaniko on Kubernetes)') {
             steps {
                 script {
@@ -89,7 +164,13 @@ pipeline {
 
                         for (def svc : services) {
                             def jobName = "kaniko-${svc.name}-${env.BUILD_NUMBER}".replaceAll('_', '-')
-                            def dest = "docker.io/${env.DOCKER_USER}/${svc.name}:latest"
+                            // DEVOPS-06: Push TWO immutable+rolling tags instead of only :latest.
+                            //   - :${BUILD_NUMBER} gives every build a unique, traceable tag.
+                            //   - :latest is kept so existing manifests that reference :latest
+                            //     keep resolving (no broken references).
+                            def imageRepo = "docker.io/${env.DOCKER_USER}/${svc.name}"
+                            def destVersioned = "${imageRepo}:${env.BUILD_NUMBER}"
+                            def destLatest = "${imageRepo}:latest"
                             writeFile file: 'kaniko-job.yaml', text: """apiVersion: batch/v1
 kind: Job
 metadata:
@@ -108,7 +189,8 @@ spec:
             - "--dockerfile=Dockerfile"
             - "--context=${kanikoContext}"
             - "--context-sub-path=${svc.path}"
-            - "--destination=${dest}"
+            - "--destination=${destVersioned}"
+            - "--destination=${destLatest}"
             - "--verbosity=info"
           env:
             - name: DOCKER_CONFIG
@@ -160,6 +242,38 @@ spec:
                                 fi
                                 kubectl delete job ${jobName} -n ${env.KANIKO_NAMESPACE} --ignore-not-found
                             """
+                        }
+                    }
+                }
+            }
+        }
+
+        // DEVOPS-06: Scan the freshly built images for known HIGH/CRITICAL CVEs
+        // with Trivy before they are deployed. Best-effort: if Trivy is not
+        // installed on the agent the stage is skipped (UNSTABLE, not FAILURE),
+        // and findings are reported without breaking the build (`--exit-code 0`).
+        // Tighten to `--exit-code 1` + remove catchError to gate deploys on CVEs.
+        stage('Security Scan (Trivy)') {
+            steps {
+                script {
+                    // Mirror the build matrix so every pushed image is scanned by its
+                    // versioned tag (the unique, just-built artifact for this run).
+                    def services = [
+                        'frontend', 'api-gateway', 'authentication-service',
+                        'booking-service', 'payment-service', 'flight-service',
+                        'hotel-service', 'train-service', 'profile-service',
+                        'pricing-service', 'notification-service', 'admin-service'
+                    ]
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Trivy scan failed or Trivy unavailable') {
+                        if (sh(script: 'command -v trivy >/dev/null 2>&1', returnStatus: true) != 0) {
+                            echo 'Trivy not found on agent; skipping image scan. Install Trivy to enable: https://aquasecurity.github.io/trivy'
+                        } else {
+                            for (def name : services) {
+                                def image = "docker.io/${env.DOCKER_USER}/${name}:${env.BUILD_NUMBER}"
+                                echo "Scanning ${image}"
+                                // --exit-code 0 => report only (non-gating). Bump to 1 to fail on findings.
+                                sh "trivy image --severity HIGH,CRITICAL --no-progress --exit-code 0 ${image}"
+                            }
                         }
                     }
                 }

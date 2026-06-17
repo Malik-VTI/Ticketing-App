@@ -15,10 +15,14 @@ spec:
       labels:
         app: hotel-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: hotel-service
         image: malikvti/hotel-service:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         envFrom:
         - configMapRef:
             name: service-urls
@@ -60,6 +64,11 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         readinessProbe:
           httpGet:
             path: /health/ready

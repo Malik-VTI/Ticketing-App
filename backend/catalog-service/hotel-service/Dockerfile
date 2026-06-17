@@ -11,13 +11,15 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
 # Production stage
-FROM alpine:latest
+FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates && adduser -D -u 1000 appuser
 
-WORKDIR /root/
+WORKDIR /app
 
 COPY --from=builder /app/main .
+
+USER appuser
 
 EXPOSE 8085
 

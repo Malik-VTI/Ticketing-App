@@ -55,4 +55,8 @@ patch_yaml.py
 update_policy.py
 upload_nodes.py
 
+# Scratch dir & ad-hoc kubectl patch files (HYGIENE-01)
+scratch/
+patch*.json
+
 

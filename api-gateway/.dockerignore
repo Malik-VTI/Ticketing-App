@@ -1,0 +1,16 @@
+.git
+.gitignore
+.gitattributes
+node_modules
+npm-debug.log
+*.log
+*.md
+.env
+.env.*
+.idea
+.vscode
+Dockerfile
+.dockerignore
+dist/
+test
+coverage

@@ -15,10 +15,14 @@ spec:
       labels:
         app: train-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: train-service
         image: malikvti/train-service:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8084
           name: http
@@ -37,6 +41,11 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "1000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         livenessProbe:
           httpGet:
             path: /trains/health

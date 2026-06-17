@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20.18-alpine
 
 WORKDIR /app
 
@@ -10,6 +10,9 @@ RUN npm ci --only=production
 
 # Copy source code
 COPY . .
+
+# node:20-alpine ships a non-root "node" user (uid 1000)
+USER node
 
 EXPOSE 8080
 
