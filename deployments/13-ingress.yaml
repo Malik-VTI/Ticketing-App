@@ -3,26 +3,17 @@ kind: Ingress
 metadata:
   name: ticketing-ingress
   namespace: ticketing-app
-  annotations:
-    # DEVOPS-07: cert-manager will automatically provision/renew the TLS cert
-    # referenced by spec.tls (secret "ticketing-tls") using this ClusterIssuer.
-    # REQUIRES: cert-manager installed in-cluster AND a ClusterIssuer named
-    # "letsencrypt-prod" to exist. If neither is present yet, this annotation
-    # is simply ignored: the HTTP rules below keep working, and TLS becomes
-    # active automatically once cert-manager + the ClusterIssuer are available
-    # and the "ticketing-tls" secret has been issued.
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  # DEVOPS-07: Replaced the deprecated `kubernetes.io/ingress.class` annotation
-  # (removed) with the modern, first-class ingressClassName field.
+  # DEVOPS-07: modern first-class ingressClassName (replaces the deprecated
+  # kubernetes.io/ingress.class annotation).
   ingressClassName: nginx
-  # DEVOPS-07: TLS for ticketing-app.local. cert-manager populates this secret
-  # from the ClusterIssuer above. Until the cert is issued the HTTP rules still
-  # serve traffic, so adding this block does not break existing access.
-  tls:
-  - hosts:
-    - ticketing-app.local
-    secretName: ticketing-tls
+  # TLS intentionally NOT managed by cert-manager (per decision). To enable HTTPS
+  # later WITHOUT cert-manager: create your own TLS secret
+  #   kubectl create secret tls ticketing-tls --cert=tls.crt --key=tls.key -n ticketing-app
+  # then add:
+  #   tls:
+  #   - hosts: [ticketing-app.local]
+  #     secretName: ticketing-tls
   rules:
   - host: ticketing-app.local
     http:

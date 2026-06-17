@@ -21,8 +21,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: admin-service
-        image: malikvti/admin-service:1.0.1
-        imagePullPolicy: IfNotPresent
+        image: malikvti/admin-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8088
           name: http

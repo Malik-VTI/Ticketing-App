@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: frontend
-        image: malikvti/frontend:1.0.5
+        image: malikvti/frontend:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
