@@ -436,13 +436,15 @@ func (s *bookingService) toBookingDTO(booking *models.Booking, items []*models.B
 }
 
 // generateBookingReference generates a unique booking reference.
-// Uses a local rand.Rand instance (not the deprecated global rand.Seed).
+// Uses the package-level rand source (auto-seeded & concurrency-safe in Go 1.20+).
 func generateBookingReference() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// Reseeding a fresh source from time.Now() on every call previously produced
+	// identical references for bookings created within the same clock tick — a real
+	// collision risk against the UNIQUE booking_reference constraint under load.
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, 8)
 	for i := range b {
-		b[i] = charset[r.Intn(len(charset))]
+		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return fmt.Sprintf("BK-%s", string(b))
 }
