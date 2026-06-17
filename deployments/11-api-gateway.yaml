@@ -15,10 +15,12 @@ spec:
       labels:
         app: api-gateway
     spec:
+      imagePullSecrets:
+      - name: dockerhub-credentials
       containers:
       - name: api-gateway
-        image: malikvti/api-gateway:1.0.1
-        imagePullPolicy: IfNotPresent
+        image: malikvti/api-gateway:1.0.3
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
           name: http
