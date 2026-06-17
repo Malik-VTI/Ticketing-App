@@ -47,7 +47,16 @@ func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
 }
 
 // Register handles user registration
-// POST /auth/register
+// @Summary Register a new user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.RegisterRequest true "Registration payload"
+// @Success 201 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 409 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -140,7 +149,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 // Login handles user authentication
-// POST /auth/login
+// @Summary Authenticate a user and issue tokens
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Login payload"
+// @Success 200 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -219,7 +237,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 // RefreshToken handles token refresh
-// POST /auth/refresh
+// @Summary Refresh the access token using the refresh token cookie
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.RefreshTokenRequest false "Optional refresh token payload (cookie preferred)"
+// @Success 200 {object} models.AuthResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Prefer the httpOnly cookie, fall back to request body for backward compatibility
 	refreshTokenStr, err := c.Cookie("refresh_token")
@@ -304,14 +330,26 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 }
 
 // Logout clears the refresh token cookie
-// POST /auth/logout
+// @Summary Log out the current user by clearing the refresh token cookie
+// @Tags auth
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	h.clearRefreshCookie(c)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 
 // GetProfile returns the current user's profile
-// GET /auth/profile
+// @Summary Get the authenticated user's profile
+// @Tags auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.UserInfo
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/profile [get]
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {

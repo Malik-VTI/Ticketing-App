@@ -4,6 +4,9 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "hotel-service/docs"
 	"hotel-service/handlers"
 	"hotel-service/repository"
 )
@@ -43,6 +46,9 @@ func SetupRoutes(
 	// Health check
 	router.GET("/health", hotelHandler.Health)
 	router.GET("/health/ready", hotelHandler.Ready)
+
+	// Swagger documentation endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Public routes
 	public := router.Group("/hotels")

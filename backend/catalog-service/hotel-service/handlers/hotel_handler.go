@@ -36,6 +36,16 @@ func NewHotelHandler(
 }
 
 // GetHotels handles GET /hotels
+// @Summary List hotels (optionally filtered by city) with pagination
+// @Tags hotels
+// @Produce json
+// @Param city query string false "Filter by city"
+// @Param page query int false "Page number (0-based)"
+// @Param size query int false "Page size (max 100)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels [get]
 func (h *HotelHandler) GetHotels(c *gin.Context) {
 	var searchReq models.HotelSearchRequest
 	if err := c.ShouldBindQuery(&searchReq); err != nil {
@@ -105,6 +115,15 @@ func (h *HotelHandler) GetHotels(c *gin.Context) {
 }
 
 // GetHotelByID handles GET /hotels/:id
+// @Summary Get a hotel by ID including its room types
+// @Tags hotels
+// @Produce json
+// @Param id path string true "Hotel ID (UUID)"
+// @Success 200 {object} models.HotelDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels/{id} [get]
 func (h *HotelHandler) GetHotelByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -171,6 +190,17 @@ func (h *HotelHandler) GetHotelByID(c *gin.Context) {
 }
 
 // GetRooms handles GET /hotels/:id/rooms
+// @Summary Get available rooms for a hotel
+// @Tags hotels
+// @Produce json
+// @Param id path string true "Hotel ID (UUID)"
+// @Param checkin query string false "Check-in date (YYYY-MM-DD)"
+// @Param checkout query string false "Check-out date (YYYY-MM-DD)"
+// @Param guests query int false "Minimum room capacity"
+// @Success 200 {array} models.AvailableRoomInfo
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels/{id}/rooms [get]
 func (h *HotelHandler) GetRooms(c *gin.Context) {
 	hotelIDStr := c.Param("id")
 	hotelID, err := uuid.Parse(hotelIDStr)
@@ -267,6 +297,17 @@ func (h *HotelHandler) GetRooms(c *gin.Context) {
 }
 
 // ReserveRooms handles POST /hotels/:id/reserve
+// @Summary Reserve rooms of a given room type
+// @Tags hotels
+// @Accept json
+// @Produce json
+// @Param id path string true "Hotel ID (UUID)"
+// @Param request body models.ReserveRoomsRequest true "Reservation payload"
+// @Success 200 {object} models.ReserveRoomsResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 409 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels/{id}/reserve [post]
 func (h *HotelHandler) ReserveRooms(c *gin.Context) {
 	var req models.ReserveRoomsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -311,6 +352,16 @@ func (h *HotelHandler) ReserveRooms(c *gin.Context) {
 }
 
 // ReleaseRooms handles POST /hotels/:id/release
+// @Summary Release previously reserved rooms
+// @Tags hotels
+// @Accept json
+// @Produce json
+// @Param id path string true "Hotel ID (UUID)"
+// @Param request body models.ReleaseRoomsRequest true "Release payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels/{id}/release [post]
 func (h *HotelHandler) ReleaseRooms(c *gin.Context) {
 	var req models.ReleaseRoomsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -351,6 +402,14 @@ func (h *HotelHandler) ReleaseRooms(c *gin.Context) {
 }
 
 // GetRates handles GET /hotels/:id/rates
+// @Summary Get room rates for all room types of a hotel
+// @Tags hotels
+// @Produce json
+// @Param id path string true "Hotel ID (UUID)"
+// @Success 200 {array} models.RoomRateDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /hotels/{id}/rates [get]
 func (h *HotelHandler) GetRates(c *gin.Context) {
 	hotelIDStr := c.Param("id")
 	hotelID, err := uuid.Parse(hotelIDStr)

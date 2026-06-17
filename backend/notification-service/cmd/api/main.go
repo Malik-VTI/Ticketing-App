@@ -13,13 +13,20 @@ import (
 	"syscall"
 	"time"
 
+	_ "notification-service/docs"
 	"notification-service/internal/handlers"
 	"notification-service/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Notification Service API
+// @version 1.0
+// @description Notification service that sends booking and payment email notifications. The /notifications/send endpoint is invoked service-to-service by the booking and payment services.
+// @BasePath /
 func main() {
 	// Configure structured (JSON) logging as the default logger.
 	logLevel := slog.LevelInfo
@@ -76,6 +83,9 @@ func main() {
 
 	router.GET("/health", handler.Health)
 	router.GET("/health/ready", handler.Ready)
+
+	// Swagger documentation endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Internal route — no auth required (service-to-service)
 	notifications := router.Group("/notifications")

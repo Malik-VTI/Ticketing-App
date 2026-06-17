@@ -34,7 +34,18 @@ func getAuthenticatedUserID(c *gin.Context) (uuid.UUID, bool) {
 	return parsed, true
 }
 
-// POST /payments
+// CreatePayment handles POST /payments
+// @Summary Create a payment
+// @Description Creates a payment for a booking on behalf of the authenticated user.
+// @Tags payments
+// @Accept json
+// @Produce json
+// @Param request body models.CreatePaymentRequest true "Payment to create"
+// @Success 201 {object} models.PaymentDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /payments [post]
 func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 	userID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -57,7 +68,17 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 	c.JSON(http.StatusCreated, payment)
 }
 
-// GET /payments/:id
+// GetPayment handles GET /payments/:id
+// @Summary Get a payment by ID
+// @Description Returns a single payment by its ID.
+// @Tags payments
+// @Produce json
+// @Param id path string true "Payment ID (UUID)"
+// @Success 200 {object} models.PaymentDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /payments/{id} [get]
 func (h *PaymentHandler) GetPayment(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -79,7 +100,19 @@ func (h *PaymentHandler) GetPayment(c *gin.Context) {
 	c.JSON(http.StatusOK, payment)
 }
 
-// POST /payments/:id/refund
+// RefundPayment handles POST /payments/:id/refund
+// @Summary Refund a payment
+// @Description Refunds a succeeded payment owned by the authenticated user.
+// @Tags payments
+// @Produce json
+// @Param id path string true "Payment ID (UUID)"
+// @Success 200 {object} models.PaymentDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /payments/{id}/refund [post]
 func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 	userID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -112,7 +145,13 @@ func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 	c.JSON(http.StatusOK, payment)
 }
 
-// GET /health
+// Health handles GET /health
+// @Summary Liveness health check
+// @Description Shallow liveness probe. Does not depend on the database.
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
 func (h *PaymentHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "payment-service"})
 }

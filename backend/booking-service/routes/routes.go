@@ -7,8 +7,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
 	"booking-service/clients"
 	"booking-service/database"
+	_ "booking-service/docs"
 	"booking-service/handlers"
 	"booking-service/middleware"
 	"booking-service/repository"
@@ -55,6 +59,9 @@ func SetupRoutes(
 	// Drain the notification outbox in the background (Transactional Outbox / ARCH-05)
 	bookingService.StartOutboxWorker()
 	bookingHandler := handlers.NewBookingHandler(bookingService)
+
+	// Swagger UI (DOC-01)
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Health check (liveness — shallow, must not depend on the DB)
 	router.GET("/health", bookingHandler.Health)

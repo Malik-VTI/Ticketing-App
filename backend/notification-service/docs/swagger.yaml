@@ -1,0 +1,91 @@
+basePath: /
+definitions:
+  notification-service_internal_models.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  notification-service_internal_models.NotificationType:
+    enum:
+    - booking_confirmation
+    - payment_confirmation
+    - booking_cancelled
+    type: string
+    x-enum-varnames:
+    - TypeBookingConfirmation
+    - TypePaymentConfirmation
+    - TypeBookingCancelled
+  notification-service_internal_models.SendNotificationRequest:
+    properties:
+      amount:
+        type: number
+      booking_id:
+        type: string
+      currency:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      reference:
+        type: string
+      type:
+        $ref: '#/definitions/notification-service_internal_models.NotificationType'
+      user_id:
+        type: string
+    required:
+    - email
+    - type
+    - user_id
+    type: object
+info:
+  contact: {}
+  description: Notification service that sends booking and payment email notifications.
+    The /notifications/send endpoint is invoked service-to-service by the booking
+    and payment services.
+  title: Notification Service API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness probe
+      tags:
+      - health
+  /notifications/send:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Notification payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/notification-service_internal_models.SendNotificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/notification-service_internal_models.ErrorResponse'
+      summary: Queue an email notification (service-to-service)
+      tags:
+      - notifications
+swagger: "2.0"

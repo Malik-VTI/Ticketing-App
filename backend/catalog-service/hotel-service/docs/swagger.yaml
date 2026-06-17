@@ -1,0 +1,356 @@
+basePath: /
+definitions:
+  models.AvailableRoomInfo:
+    properties:
+      available_count:
+        type: integer
+      capacity:
+        type: integer
+      currency:
+        type: string
+      min_price:
+        type: number
+      room_type_id:
+        type: string
+      room_type_name:
+        type: string
+      total_count:
+        type: integer
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.HotelDTO:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      rating:
+        type: number
+      room_types:
+        items:
+          $ref: '#/definitions/models.RoomTypeDTO'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  models.ReleaseRoomsRequest:
+    properties:
+      room_numbers:
+        items:
+          type: string
+        type: array
+      room_type_id:
+        type: string
+    required:
+    - room_numbers
+    - room_type_id
+    type: object
+  models.ReserveRoomsRequest:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      quantity:
+        minimum: 1
+        type: integer
+      room_type_id:
+        type: string
+    required:
+    - check_in
+    - check_out
+    - quantity
+    - room_type_id
+    type: object
+  models.ReserveRoomsResponse:
+    properties:
+      room_numbers:
+        items:
+          type: string
+        type: array
+    type: object
+  models.RoomDTO:
+    properties:
+      created_at:
+        type: string
+      floor:
+        type: integer
+      id:
+        type: string
+      room_number:
+        type: string
+      room_type_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.RoomRateDTO:
+    properties:
+      created_at:
+        type: string
+      currency:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      price:
+        type: number
+      room_type_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.RoomTypeDTO:
+    properties:
+      amenities:
+        type: string
+      capacity:
+        type: integer
+      created_at:
+        type: string
+      hotel_id:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      rates:
+        items:
+          $ref: '#/definitions/models.RoomRateDTO'
+        type: array
+      rooms:
+        items:
+          $ref: '#/definitions/models.RoomDTO'
+        type: array
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Hotel catalog service exposing hotel search, room availability, rates,
+    and room reservation/release operations for the ticketing platform.
+  title: Hotel Service API
+  version: "1.0"
+paths:
+  /hotels:
+    get:
+      parameters:
+      - description: Filter by city
+        in: query
+        name: city
+        type: string
+      - description: Page number (0-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 100)
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: List hotels (optionally filtered by city) with pagination
+      tags:
+      - hotels
+  /hotels/{id}:
+    get:
+      parameters:
+      - description: Hotel ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HotelDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get a hotel by ID including its room types
+      tags:
+      - hotels
+  /hotels/{id}/rates:
+    get:
+      parameters:
+      - description: Hotel ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.RoomRateDTO'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get room rates for all room types of a hotel
+      tags:
+      - hotels
+  /hotels/{id}/release:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hotel ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Release payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ReleaseRoomsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Release previously reserved rooms
+      tags:
+      - hotels
+  /hotels/{id}/reserve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hotel ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reservation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ReserveRoomsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ReserveRoomsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Reserve rooms of a given room type
+      tags:
+      - hotels
+  /hotels/{id}/rooms:
+    get:
+      parameters:
+      - description: Hotel ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Check-in date (YYYY-MM-DD)
+        in: query
+        name: checkin
+        type: string
+      - description: Check-out date (YYYY-MM-DD)
+        in: query
+        name: checkout
+        type: string
+      - description: Minimum room capacity
+        in: query
+        name: guests
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AvailableRoomInfo'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get available rooms for a hotel
+      tags:
+      - hotels
+swagger: "2.0"

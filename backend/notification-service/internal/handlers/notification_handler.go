@@ -18,10 +18,18 @@ func NewNotificationHandler(svc service.EmailService) *NotificationHandler {
 	return &NotificationHandler{emailService: svc}
 }
 
-// POST /notifications/send
+// Send queues an email notification.
 // This endpoint is called by other services (booking, payment).
 // Errors are non-fatal from the caller perspective — if email fails, we log it
 // but still return 200 to avoid blocking the calling service.
+// @Summary Queue an email notification (service-to-service)
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param request body models.SendNotificationRequest true "Notification payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} models.ErrorResponse
+// @Router /notifications/send [post]
 func (h *NotificationHandler) Send(c *gin.Context) {
 	var req models.SendNotificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -46,7 +54,12 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 	})
 }
 
-// GET /health
+// Health reports service liveness.
+// @Summary Liveness probe
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
 func (h *NotificationHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "notification-service"})
 }

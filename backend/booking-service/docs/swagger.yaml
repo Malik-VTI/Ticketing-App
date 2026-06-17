@@ -1,0 +1,365 @@
+basePath: /
+definitions:
+  models.BookingDTO:
+    properties:
+      booking_reference:
+        type: string
+      booking_type:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/models.BookingItemDTO'
+        type: array
+      status:
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.BookingItemDTO:
+    properties:
+      booking_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      item_ref_id:
+        type: string
+      item_type:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.BookingMetadata'
+      price:
+        type: number
+      quantity:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.BookingMetadata:
+    properties:
+      check_in_date:
+        type: string
+      check_out_date:
+        type: string
+      passenger_names:
+        items:
+          type: string
+        type: array
+      room_numbers:
+        items:
+          type: string
+        type: array
+      seat_numbers:
+        items:
+          type: string
+        type: array
+    type: object
+  models.CreateBookingItemRequest:
+    properties:
+      item_ref_id:
+        type: string
+      item_type:
+        enum:
+        - flight
+        - train
+        - hotel
+        type: string
+      metadata:
+        $ref: '#/definitions/models.BookingMetadata'
+      price:
+        minimum: 0
+        type: number
+      quantity:
+        minimum: 1
+        type: integer
+    required:
+    - item_ref_id
+    - item_type
+    - price
+    - quantity
+    type: object
+  models.CreateBookingRequest:
+    properties:
+      booking_type:
+        enum:
+        - flight
+        - train
+        - hotel
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/models.CreateBookingItemRequest'
+        minItems: 1
+        type: array
+    required:
+    - booking_type
+    - items
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Booking service (Gin) — bookings, seat lock, transactional outbox.
+  title: Booking Service API
+  version: "1.0"
+paths:
+  /bookings:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new booking for the authenticated user.
+      parameters:
+      - description: Booking to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateBookingRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.BookingDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a booking
+      tags:
+      - bookings
+  /bookings/{id}:
+    get:
+      description: Returns a single booking owned by the authenticated user.
+      parameters:
+      - description: Booking ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.BookingDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get a booking by ID
+      tags:
+      - bookings
+  /bookings/{id}/cancel:
+    post:
+      description: Cancels a booking owned by the authenticated user.
+      parameters:
+      - description: Booking ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Cancel a booking
+      tags:
+      - bookings
+  /bookings/{id}/confirm:
+    post:
+      description: Confirms a pending booking. Internal endpoint called by the payment
+        service with an internal API key.
+      parameters:
+      - description: Booking ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Confirm a booking (internal)
+      tags:
+      - bookings
+  /bookings/reference/{reference}:
+    get:
+      description: Returns a single booking matching the given booking reference.
+      parameters:
+      - description: Booking reference
+        in: path
+        name: reference
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.BookingDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get a booking by reference
+      tags:
+      - bookings
+  /bookings/user/{userId}:
+    get:
+      description: Returns a paginated list of bookings for the authenticated user.
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Max results (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Result offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.BookingDTO'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: List a user's bookings
+      tags:
+      - bookings
+  /health:
+    get:
+      description: Shallow liveness probe. Does not depend on the database.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness health check
+      tags:
+      - health
+swagger: "2.0"

@@ -43,6 +43,17 @@ func getAuthenticatedUserID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 // CreateBooking handles POST /bookings
+// @Summary Create a booking
+// @Description Creates a new booking for the authenticated user.
+// @Tags bookings
+// @Accept json
+// @Produce json
+// @Param request body models.CreateBookingRequest true "Booking to create"
+// @Success 201 {object} models.BookingDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings [post]
 func (h *BookingHandler) CreateBooking(c *gin.Context) {
 	authenticatedUserID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -75,6 +86,18 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 }
 
 // GetBooking handles GET /bookings/:id
+// @Summary Get a booking by ID
+// @Description Returns a single booking owned by the authenticated user.
+// @Tags bookings
+// @Produce json
+// @Param id path string true "Booking ID (UUID)"
+// @Success 200 {object} models.BookingDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings/{id} [get]
 func (h *BookingHandler) GetBooking(c *gin.Context) {
 	authenticatedUserID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -124,6 +147,17 @@ func (h *BookingHandler) GetBooking(c *gin.Context) {
 }
 
 // GetBookingByReference handles GET /bookings/reference/:reference
+// @Summary Get a booking by reference
+// @Description Returns a single booking matching the given booking reference.
+// @Tags bookings
+// @Produce json
+// @Param reference path string true "Booking reference"
+// @Success 200 {object} models.BookingDTO
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings/reference/{reference} [get]
 func (h *BookingHandler) GetBookingByReference(c *gin.Context) {
 	authenticatedUserID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -165,6 +199,19 @@ func (h *BookingHandler) GetBookingByReference(c *gin.Context) {
 }
 
 // GetUserBookings handles GET /bookings/user/:userId
+// @Summary List a user's bookings
+// @Description Returns a paginated list of bookings for the authenticated user.
+// @Tags bookings
+// @Produce json
+// @Param userId path string true "User ID (UUID)"
+// @Param limit query int false "Max results (default 20, max 100)"
+// @Param offset query int false "Result offset (default 0)"
+// @Success 200 {array} models.BookingDTO
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings/user/{userId} [get]
 func (h *BookingHandler) GetUserBookings(c *gin.Context) {
 	authenticatedUserID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -223,6 +270,18 @@ func (h *BookingHandler) GetUserBookings(c *gin.Context) {
 }
 
 // CancelBooking handles POST /bookings/:id/cancel
+// @Summary Cancel a booking
+// @Description Cancels a booking owned by the authenticated user.
+// @Tags bookings
+// @Produce json
+// @Param id path string true "Booking ID (UUID)"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings/{id}/cancel [post]
 func (h *BookingHandler) CancelBooking(c *gin.Context) {
 	authenticatedUserID, ok := getAuthenticatedUserID(c)
 	if !ok {
@@ -292,6 +351,16 @@ func (h *BookingHandler) CancelBooking(c *gin.Context) {
 }
 
 // ConfirmBooking handles POST /bookings/:id/confirm (internal, called by payment service)
+// @Summary Confirm a booking (internal)
+// @Description Confirms a pending booking. Internal endpoint called by the payment service with an internal API key.
+// @Tags bookings
+// @Produce json
+// @Param id path string true "Booking ID (UUID)"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bookings/{id}/confirm [post]
 func (h *BookingHandler) ConfirmBooking(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -337,6 +406,12 @@ func (h *BookingHandler) ConfirmBooking(c *gin.Context) {
 }
 
 // Health handles GET /health
+// @Summary Liveness health check
+// @Description Shallow liveness probe. Does not depend on the database.
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
 func (h *BookingHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",

@@ -21,6 +21,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// @title Authentication Service API
+// @version 1.0
+// @description Authentication service handling user registration, login, JWT issuance/refresh and profile retrieval for the ticketing platform.
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	// Configure structured (JSON) logging as the default logger.
 	logLevel := slog.LevelInfo
