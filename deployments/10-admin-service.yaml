@@ -15,6 +15,10 @@ spec:
       labels:
         app: admin-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: admin-service
         image: malikvti/admin-service:1.0.1
@@ -37,6 +41,11 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "1000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         livenessProbe:
           httpGet:
             path: /api/admin/health

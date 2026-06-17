@@ -17,12 +17,21 @@ spec:
     spec:
       imagePullSecrets:
       - name: dockerhub-credentials
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: frontend
         image: malikvti/frontend:1.0.5
         imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: http
         resources:
           requests:
@@ -34,13 +43,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /
-            port: 80
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /
-            port: 80
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
 ---
@@ -54,8 +63,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
+  # Service port stays 80 (ingress refers to service port 80); pods listen on 8080
   - port: 80
-    targetPort: 80
+    targetPort: 8080
     protocol: TCP
     name: http
   selector:

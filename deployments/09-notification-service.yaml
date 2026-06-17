@@ -15,10 +15,14 @@ spec:
       labels:
         app: notification-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: notification-service
         image: malikvti/notification-service:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8087
           name: http
@@ -37,6 +41,11 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "1000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         livenessProbe:
           httpGet:
             path: /health
