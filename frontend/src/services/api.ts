@@ -1,9 +1,11 @@
 import axios, { AxiosRequestConfig } from 'axios'
+import { callRefreshHandler } from './tokenRefresh'
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -66,12 +68,8 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        // Use the refresh function exposed by AuthContext through window
-        const refreshFn = (window as any).__refreshAccessToken as
-          | (() => Promise<string | null>)
-          | undefined
-
-        const newToken = refreshFn ? await refreshFn() : null
+        // Use the refresh function registered by AuthContext via the singleton bridge
+        const newToken = await callRefreshHandler()
 
         isRefreshing = false
         onTokenRefreshed(newToken)
@@ -117,7 +115,7 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
   token_type: string
   expires_in: number
   user: {
@@ -147,11 +145,13 @@ export const authAPI = {
     return response.data
   },
 
-  refreshToken: async (refreshToken: string): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/refresh', {
-      refresh_token: refreshToken,
-    })
+  refreshToken: async (): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/refresh')
     return response.data
+  },
+
+  logout: async () => {
+    await api.post('/auth/logout')
   },
 
   getProfile: async () => {

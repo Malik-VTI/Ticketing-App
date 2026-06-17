@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { authAPI, AuthResponse } from '../services/api'
+import { setRefreshHandler } from '../services/tokenRefresh'
 
 interface User {
   id: string
@@ -49,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response: AuthResponse = await authAPI.login({ email, password })
 
       localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
       localStorage.setItem('user', JSON.stringify(response.user))
 
       setUser(response.user)
@@ -68,7 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       })
 
       localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
       localStorage.setItem('user', JSON.stringify(response.user))
 
       setUser(response.user)
@@ -78,33 +77,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const logout = () => {
+    // Fire-and-forget: clear the httpOnly refresh cookie on the server
+    authAPI.logout().catch(() => {})
     localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('refresh_token') // defensive cleanup of any legacy value
     localStorage.removeItem('user')
     setUser(null)
   }
 
   /**
-   * Attempts to refresh the access token using the stored refresh token.
-   * Returns the new access token on success, or null if refresh fails.
-   * On failure it clears auth state (equivalent to logout).
+   * Attempts to refresh the access token. The refresh token now lives in an
+   * httpOnly cookie sent automatically by the browser, so no token is read
+   * from localStorage. Returns the new access token on success, or null if
+   * refresh fails. On failure it clears auth state (equivalent to logout).
    */
   const refreshAccessToken = async (): Promise<string | null> => {
-    const storedRefreshToken = localStorage.getItem('refresh_token')
-    if (!storedRefreshToken) {
-      logout()
-      return null
-    }
-
     try {
-      const response: AuthResponse = await authAPI.refreshToken(storedRefreshToken)
+      const response = await authAPI.refreshToken()
       localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
       localStorage.setItem('user', JSON.stringify(response.user))
       setUser(response.user)
       return response.access_token
     } catch {
-      // Refresh token is also invalid/expired — force logout
       logout()
       return null
     }
@@ -115,11 +109,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshFnRef.current = refreshAccessToken
   }, [])
 
-  // Attach ref to window for the axios interceptor to access without circular imports
+  // Register the refresh function with the singleton bridge so the axios
+  // interceptor (api.ts) can call it without circular imports or window pollution
   useEffect(() => {
-    (window as any).__refreshAccessToken = refreshAccessToken
+    setRefreshHandler(refreshAccessToken)
     return () => {
-      delete (window as any).__refreshAccessToken
+      setRefreshHandler(null)
     }
   }, [])
 

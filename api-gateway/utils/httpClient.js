@@ -70,6 +70,23 @@ const proxyRequest = async (client, method, path, options = {}) => {
 };
 
 /**
+ * Proxy an auth request to the upstream service, forwarding the incoming
+ * Cookie header and returning any Set-Cookie headers from the response.
+ */
+const proxyAuthRequest = async (client, method, path, { data, cookie } = {}) => {
+  try {
+    const config = { method: method.toLowerCase(), url: path, headers: { ...(cookie && { Cookie: cookie }) } };
+    if (data) config.data = data;
+    const response = await client.request(config);
+    return { data: response.data, setCookie: response.headers['set-cookie'] };
+  } catch (error) {
+    if (error.response) throw { status: error.response.status, data: error.response.data, message: error.response.data?.message || error.message };
+    else if (error.request) throw { status: 503, message: 'Service unavailable', data: { error: 'service_unavailable' } };
+    else throw { status: 500, message: error.message, data: { error: 'internal_error' } };
+  }
+};
+
+/**
  * Aggregate multiple service requests
  */
 const aggregateRequests = async (requests) => {
@@ -102,6 +119,7 @@ const aggregateRequests = async (requests) => {
 module.exports = {
   createServiceClient,
   proxyRequest,
+  proxyAuthRequest,
   aggregateRequests,
 };
 

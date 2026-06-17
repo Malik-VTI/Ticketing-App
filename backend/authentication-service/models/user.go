@@ -34,7 +34,7 @@ type RefreshTokenRequest struct {
 
 type AuthResponse struct {
 	AccessToken  string   `json:"access_token"`
-	RefreshToken string   `json:"refresh_token"`
+	RefreshToken string   `json:"refresh_token,omitempty"`
 	TokenType    string   `json:"token_type"`
 	ExpiresIn    int      `json:"expires_in"`
 	Messages     string   `json:"messages"`
