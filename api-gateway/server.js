@@ -22,7 +22,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Health check endpoint — registered BEFORE rate limiter so that
+// Kubernetes liveness/readiness probes are never throttled (429).
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy', service: 'api-gateway', timestamp: new Date().toISOString() });
+});
+
+// Rate limiting (applied to all /api/ routes EXCEPT /api/health above)
 const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max,
@@ -32,9 +38,20 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health', // extra safety — skip health inside /api/
 });
 
 app.use('/api/', limiter);
+
+// Security headers (SEC-06) — applied to all responses, before routes
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
 
 // Request logging middleware (development)
 if (process.env.NODE_ENV === 'development') {

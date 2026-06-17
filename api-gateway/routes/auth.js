@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createServiceClient, proxyRequest } = require('../utils/httpClient');
+const { createServiceClient, proxyRequest, proxyAuthRequest } = require('../utils/httpClient');
 const { authenticate } = require('../middleware/auth');
 const config = require('../config/config');
 
@@ -12,9 +12,10 @@ const authClient = createServiceClient(config.services.auth.baseUrl, config.serv
  */
 router.post('/register', async (req, res) => {
   try {
-    const data = await proxyRequest(authClient, 'POST', '/auth/register', {
+    const { data, setCookie } = await proxyAuthRequest(authClient, 'POST', '/auth/register', {
       data: req.body,
     });
+    if (setCookie) res.set('Set-Cookie', setCookie);
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json(error.data || { error: error.message });
@@ -27,9 +28,10 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    const data = await proxyRequest(authClient, 'POST', '/auth/login', {
+    const { data, setCookie } = await proxyAuthRequest(authClient, 'POST', '/auth/login', {
       data: req.body,
     });
+    if (setCookie) res.set('Set-Cookie', setCookie);
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json(error.data || { error: error.message });
@@ -42,9 +44,27 @@ router.post('/login', async (req, res) => {
  */
 router.post('/refresh', async (req, res) => {
   try {
-    const data = await proxyRequest(authClient, 'POST', '/auth/refresh', {
+    const { data, setCookie } = await proxyAuthRequest(authClient, 'POST', '/auth/refresh', {
       data: req.body,
+      cookie: req.headers.cookie,
     });
+    if (setCookie) res.set('Set-Cookie', setCookie);
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 500).json(error.data || { error: error.message });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Clear the refresh token cookie
+ */
+router.post('/logout', async (req, res) => {
+  try {
+    const { data, setCookie } = await proxyAuthRequest(authClient, 'POST', '/auth/logout', {
+      cookie: req.headers.cookie,
+    });
+    if (setCookie) res.set('Set-Cookie', setCookie);
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json(error.data || { error: error.message });

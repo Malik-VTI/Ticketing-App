@@ -50,3 +50,10 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 func (h *NotificationHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "notification-service"})
 }
+
+// GET /health/ready
+// notification-service has no database or external dependency required to serve
+// traffic, so readiness simply reports that the process is up and serving.
+func (h *NotificationHandler) Ready(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ready"})
+}

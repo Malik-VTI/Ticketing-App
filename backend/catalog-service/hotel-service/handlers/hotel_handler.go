@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -401,4 +402,15 @@ func (h *HotelHandler) Health(c *gin.Context) {
 		"status":  "ok",
 		"service": "hotel-service",
 	})
+}
+
+// Ready handles GET /health/ready and verifies database connectivity
+func (h *HotelHandler) Ready(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	if err := database.DB.PingContext(ctx); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ready"})
 }

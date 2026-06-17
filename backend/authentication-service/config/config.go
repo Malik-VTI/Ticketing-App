@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
 )
@@ -10,6 +11,7 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Redis    RedisConfig
+	Cookie   CookieConfig
 }
 
 type ServerConfig struct {
@@ -39,6 +41,12 @@ type RedisConfig struct {
 	Enabled  bool
 }
 
+type CookieConfig struct {
+	Secure   bool
+	SameSite string
+	Domain   string
+}
+
 func LoadConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -49,11 +57,11 @@ func LoadConfig() *Config {
 			Server:   getEnv("DB_SERVER", "10.100.33.184"),
 			Database: getEnv("DB_DATABASE", "ticketing_app"),
 			UserID:   getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "P@ssw0rd"),
+			Password: mustGetEnv("DB_PASSWORD"),
 			Port:     getEnvAsInt("DB_PORT", 5432),
 		},
 		JWT: JWTConfig{
-			SecretKey:     getEnv("JWT_SECRET_KEY", "bGZiXRX7b3FPCzLWkfRLiUtrQ+lknCeKMtSF9+oJKNI="),
+			SecretKey:     mustGetEnv("JWT_SECRET_KEY"),
 			AccessExpiry:  getEnvAsInt("JWT_ACCESS_EXPIRY", 15), // 15 minutes
 			RefreshExpiry: getEnvAsInt("JWT_REFRESH_EXPIRY", 7), // 7 days
 		},
@@ -64,7 +72,20 @@ func LoadConfig() *Config {
 			DB:       getEnvAsInt("REDIS_DB", 0),
 			Enabled:  getEnvAsBool("REDIS_ENABLED", false),
 		},
+		Cookie: CookieConfig{
+			Secure:   getEnvAsBool("COOKIE_SECURE", false),
+			SameSite: getEnv("COOKIE_SAMESITE", "lax"),
+			Domain:   getEnv("COOKIE_DOMAIN", ""),
+		},
 	}
+}
+
+func mustGetEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("FATAL: required environment variable %s is not set", key)
+	}
+	return value
 }
 
 func getEnv(key, defaultValue string) string {

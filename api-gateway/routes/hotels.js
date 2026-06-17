@@ -5,6 +5,15 @@ const config = require('../config/config');
 
 const hotelClient = createServiceClient(config.services.hotel.baseUrl, config.services.hotel.timeout);
 
+// Lightweight input validation helpers (no external dependency)
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const isValidDate = (value) => DATE_REGEX.test(value);
+const isValidName = (value) => {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= 100;
+};
+
 // GET /api/hotels - List hotels with pagination and search
 router.get('/', async (req, res) => {
   try {
@@ -26,6 +35,27 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({
         error: 'missing_parameters',
         message: 'city is required',
+      });
+    }
+
+    if (!isValidName(city)) {
+      return res.status(400).json({
+        error: 'invalid_name',
+        message: 'city must be 1-100 characters',
+      });
+    }
+
+    if (checkin && !isValidDate(checkin)) {
+      return res.status(400).json({
+        error: 'invalid_date',
+        message: 'date must be YYYY-MM-DD',
+      });
+    }
+
+    if (checkout && !isValidDate(checkout)) {
+      return res.status(400).json({
+        error: 'invalid_date',
+        message: 'date must be YYYY-MM-DD',
       });
     }
 

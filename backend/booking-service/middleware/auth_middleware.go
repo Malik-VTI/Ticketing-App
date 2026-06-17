@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -17,7 +18,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	// Get JWT secret key from environment (same as auth service)
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
-		jwtSecret = "bGZiXRX7b3FPCzLWkfRLiUtrQ+lknCeKMtSF9+oJKNI=" // Default fallback
+		log.Fatal("FATAL: JWT_SECRET_KEY environment variable is required")
 	}
 
 	return func(c *gin.Context) {

@@ -15,10 +15,12 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+      - name: dockerhub-credentials
       containers:
       - name: frontend
-        image: malikvti/frontend:1.0.1
-        imagePullPolicy: IfNotPresent
+        image: malikvti/frontend:1.0.5
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http

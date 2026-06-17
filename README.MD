@@ -1,9 +1,29 @@
 # Dokumentasi Arsitektur Microservices — Aplikasi Tiketing (Kereta, Pesawat, Hotel)
 
-> Teknologi: Frontend — Node.js + React.js
+> Teknologi: Frontend — React + Vite (SPA)
 > Backend — Go (gin) & Java (Spring Boot)
-> Database — Microsoft SQL Server (MSSQL)
-> Integrasi cache / state — Redis
+> Database — **PostgreSQL**
+> Integrasi cache / state — Redis (opsional, `REDIS_ENABLED`)
+
+---
+
+## ⚠️ Status Implementasi Aktual (per 2026-06-17)
+
+> Dokumen di bawah ini sebagian besar adalah **desain target/aspiratif**. Berikut yang
+> benar-benar terimplementasi di kode saat ini agar tidak menyesatkan:
+
+| Aspek | Di dokumen desain | Implementasi nyata |
+|------|-------------------|--------------------|
+| Database | MSSQL (`UNIQUEIDENTIFIER`, DDL T-SQL) | **PostgreSQL** (`sql.Open("postgres", ...)`, driver `lib/pq`) |
+| Komunikasi antar-service | Event-driven + Message Broker (RabbitMQ/Kafka) | **HTTP sinkron** — belum ada broker sama sekali |
+| Event (`booking.created`, `payment.succeeded`, dll) | Dipublikasikan via event bus | **Belum ada** — alur memanggil service lain langsung via HTTP |
+| Saga / orchestration | Untuk booking+payment+inventory | **Belum ada** (lihat ARCH-02 di `docs/IMPROVEMENT-FINDINGS.md`) |
+| Auth antar-service | — | Shared `INTERNAL_API_KEY` (header `X-Internal-API-Key`) + JWT user |
+| Seat lock | Redis distributed lock | Terimplementasi via Redis (`SET NX`), aktif bila `REDIS_ENABLED=true` |
+| DDL contoh (T-SQL) di bawah | MSSQL | Hanya ilustrasi; skema nyata Postgres ada di `database/` |
+
+Roadmap perbaikan (broker, saga, circuit breaker, dll) dilacak di
+`docs/IMPROVEMENT-FINDINGS.md`.
 
 ---
 

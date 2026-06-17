@@ -6,6 +6,15 @@ const config = require('../config/config');
 const TRAIN_SERVICE_URL = config.services.train.baseUrl;
 const trainClient = createServiceClient(TRAIN_SERVICE_URL, config.services.train.timeout);
 
+// Lightweight input validation helpers (no external dependency)
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const isValidDate = (value) => DATE_REGEX.test(value);
+const isValidName = (value) => {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= 100;
+};
+
 // Utility fetch stations (autocomplete/search)
 const fetchStations = async () => {
   return proxyRequest(trainClient, 'GET', '/admin/trains/stations', {
@@ -45,6 +54,20 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({
         error: 'missing_parameters',
         message: 'originName, destinationName, and date are required'
+      });
+    }
+
+    if (!isValidDate(date)) {
+      return res.status(400).json({
+        error: 'invalid_date',
+        message: 'date must be YYYY-MM-DD'
+      });
+    }
+
+    if (!isValidName(originName) || !isValidName(destinationName)) {
+      return res.status(400).json({
+        error: 'invalid_name',
+        message: 'originName and destinationName must be 1-100 characters'
       });
     }
 

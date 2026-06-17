@@ -41,6 +41,10 @@ temp/
 # Large tar archives
 *.tar
 
+# Kubernetes secrets (plaintext) — pakai Sealed Secrets, lihat deployments/sealed-secrets/README.md
+# Hanya 01-sealed-secrets.yaml (terenkripsi) & 01-secrets.example.yaml yang boleh di-commit.
+deployments/01-secrets.yaml
+
 # SSH keys
 id_rsa
 id_rsa.pub

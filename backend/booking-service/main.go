@@ -46,6 +46,12 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	// Apply service-owned migrations (e.g. notification_outbox table for ARCH-05).
+	// Fail hard: the outbox worker depends on this table existing.
+	if err := database.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
+
 	// Initialize Redis (optional — degrades gracefully if unavailable)
 	cache.InitRedis()
 	defer cache.CloseRedis()

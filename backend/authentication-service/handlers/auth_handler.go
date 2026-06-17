@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"log"
+	"strings"
 	"time"
 
 	"authentication-service/config"
@@ -24,6 +25,25 @@ func NewAuthHandler(userRepo repository.UserRepository, cfg *config.Config) *Aut
 		userRepo: userRepo,
 		config:   cfg,
 	}
+}
+
+// setRefreshCookie writes the refresh token into an httpOnly cookie.
+func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string) {
+	switch strings.ToLower(h.config.Cookie.SameSite) {
+	case "strict":
+		c.SetSameSite(http.SameSiteStrictMode)
+	case "none":
+		c.SetSameSite(http.SameSiteNoneMode)
+	default:
+		c.SetSameSite(http.SameSiteLaxMode)
+	}
+	maxAge := h.config.JWT.RefreshExpiry * 24 * 60 * 60 // hari -> detik
+	c.SetCookie("refresh_token", token, maxAge, "/", h.config.Cookie.Domain, h.config.Cookie.Secure, true)
+}
+
+// clearRefreshCookie removes the refresh token cookie.
+func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
+	c.SetCookie("refresh_token", "", -1, "/", h.config.Cookie.Domain, h.config.Cookie.Secure, true)
 }
 
 // Register handles user registration
@@ -101,9 +121,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Calculate expires in seconds
 	expiresIn := int(time.Until(time.Unix(expiresAt, 0)).Seconds())
 
+	// Store the refresh token in an httpOnly cookie instead of the body
+	h.setRefreshCookie(c, refreshToken)
+
 	c.JSON(http.StatusCreated, models.AuthResponse{
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		RefreshToken: "",
 		TokenType:    "Bearer",
 		ExpiresIn:    expiresIn,
 		Messages:     "Registration successful",
@@ -177,9 +200,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Calculate expires in seconds
 	expiresIn := int(time.Until(time.Unix(expiresAt, 0)).Seconds())
 
+	// Store the refresh token in an httpOnly cookie instead of the body
+	h.setRefreshCookie(c, refreshToken)
+
 	c.JSON(http.StatusOK, models.AuthResponse{
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		RefreshToken: "",
 		TokenType:    "Bearer",
 		ExpiresIn:    expiresIn,
 		Messages:     "Login successful",
@@ -195,17 +221,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // RefreshToken handles token refresh
 // POST /auth/refresh
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	var req models.RefreshTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "validation_error",
-			Message: err.Error(),
+	// Prefer the httpOnly cookie, fall back to request body for backward compatibility
+	refreshTokenStr, err := c.Cookie("refresh_token")
+	if err != nil || refreshTokenStr == "" {
+		var req models.RefreshTokenRequest
+		_ = c.ShouldBindJSON(&req)
+		refreshTokenStr = req.RefreshToken
+	}
+	if refreshTokenStr == "" {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Error:   "invalid_token",
+			Message: "Missing refresh token",
 		})
 		return
 	}
 
 	// Validate refresh token
-	claims, err := utils.ValidateRefreshToken(req.RefreshToken, h.config)
+	claims, err := utils.ValidateRefreshToken(refreshTokenStr, h.config)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "invalid_token",
@@ -254,9 +286,12 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Calculate expires in seconds
 	expiresIn := int(time.Until(time.Unix(expiresAt, 0)).Seconds())
 
+	// Rotate the refresh token in the httpOnly cookie instead of the body
+	h.setRefreshCookie(c, refreshToken)
+
 	c.JSON(http.StatusOK, models.AuthResponse{
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		RefreshToken: "",
 		TokenType:    "Bearer",
 		ExpiresIn:    expiresIn,
 		User: models.UserInfo{
@@ -266,6 +301,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 			Phone:    user.Phone,
 		},
 	})
+}
+
+// Logout clears the refresh token cookie
+// POST /auth/logout
+func (h *AuthHandler) Logout(c *gin.Context) {
+	h.clearRefreshCookie(c)
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 
 // GetProfile returns the current user's profile

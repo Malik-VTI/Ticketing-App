@@ -130,35 +130,69 @@ func (s *paymentService) processPayment(p *models.Payment) (models.PaymentStatus
 
 // confirmBooking calls the booking service to update booking status to confirmed.
 // Runs asynchronously; errors are logged but not propagated.
+// The confirm operation is idempotent, so it is retried up to 3 times with
+// backoff on connection failures or 5xx responses.
 func (s *paymentService) confirmBooking(bookingID uuid.UUID) {
 	url := fmt.Sprintf("%s/bookings/%s/confirm", s.bookingBaseURL, bookingID.String())
 	log.Printf("Attempting to confirm booking %s at URL: %s", bookingID, url)
-	
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		log.Printf("ERROR: failed to create request for booking service at %s: %v", url, err)
-		return
-	}
-	
+
 	internalKey := os.Getenv("INTERNAL_API_KEY")
 	if internalKey == "" {
-		internalKey = "default-internal-secret"
-	}
-	req.Header.Set("X-Internal-API-Key", internalKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("ERROR: failed to connect to booking service at %s: %v", url, err)
+		log.Printf("ERROR: INTERNAL_API_KEY not set; cannot confirm booking %s", bookingID)
 		return
 	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode >= 400 {
-		log.Printf("ERROR: booking service returned status %d for booking %s at URL %s", resp.StatusCode, bookingID, url)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	backoffs := []time.Duration{0, 500 * time.Millisecond, 1 * time.Second}
+	maxAttempts := len(backoffs)
+
+	var lastErr error
+	var lastStatus int
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if backoffs[attempt] > 0 {
+			time.Sleep(backoffs[attempt])
+		}
+
+		req, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			log.Printf("ERROR: failed to create request for booking service at %s: %v", url, err)
+			return
+		}
+		req.Header.Set("X-Internal-API-Key", internalKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			lastStatus = 0
+			log.Printf("WARN: attempt %d/%d failed to connect to booking service at %s: %v", attempt+1, maxAttempts, url, err)
+			continue // retry on connection failure
+		}
+
+		status := resp.StatusCode
+		resp.Body.Close()
+		lastErr = nil
+		lastStatus = status
+
+		if status < 400 {
+			log.Printf("SUCCESS: Booking %s confirmed successfully via %s (attempt %d/%d)", bookingID, url, attempt+1, maxAttempts)
+			return
+		}
+
+		// Retry only on 5xx and the retryable 408/429; other 4xx are terminal.
+		if status >= 500 || status == http.StatusRequestTimeout || status == http.StatusTooManyRequests {
+			log.Printf("WARN: attempt %d/%d: booking service returned retryable status %d for booking %s at URL %s", attempt+1, maxAttempts, status, bookingID, url)
+			continue
+		}
+
+		log.Printf("ERROR: booking service returned non-retryable status %d for booking %s at URL %s; giving up", status, bookingID, url)
+		return
+	}
+
+	if lastErr != nil {
+		log.Printf("ERROR: failed to confirm booking %s after %d attempts; last error: %v", bookingID, maxAttempts, lastErr)
 	} else {
-		log.Printf("SUCCESS: Booking %s confirmed successfully via %s", bookingID, url)
+		log.Printf("ERROR: failed to confirm booking %s after %d attempts; last status: %d", bookingID, maxAttempts, lastStatus)
 	}
 }
 

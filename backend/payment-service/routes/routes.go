@@ -1,6 +1,12 @@
 package routes
 
 import (
+	"context"
+	"net/http"
+	"os"
+	"time"
+
+	"payment-service/database"
 	"payment-service/handlers"
 	"payment-service/middleware"
 	"payment-service/repository"
@@ -12,9 +18,14 @@ import (
 func SetupRoutes(paymentRepo repository.PaymentRepository) *gin.Engine {
 	router := gin.Default()
 
+	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://ticketing-app.local"
+	}
+
 	// CORS
 	router.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
@@ -28,8 +39,19 @@ func SetupRoutes(paymentRepo repository.PaymentRepository) *gin.Engine {
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	handler := handlers.NewPaymentHandler(paymentSvc)
 
-	// Health
+	// Health (liveness — shallow)
 	router.GET("/health", handler.Health)
+
+	// Readiness — pings the database
+	router.GET("/health/ready", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := database.DB.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "db": "down"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+	})
 
 	// Protected payment routes
 	protected := router.Group("/payments")
