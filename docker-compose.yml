@@ -84,6 +84,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - REDIS_ENABLED=${REDIS_ENABLED}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -113,6 +114,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - BOOKING_SERVICE_URL=http://booking-service:8082
     networks:
       - ticketing-network

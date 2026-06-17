@@ -7,6 +7,7 @@ const config = require('../config/config');
 const flightClient = createServiceClient(config.services.flight.baseUrl, config.services.flight.timeout);
 const trainClient = createServiceClient(config.services.train.baseUrl, config.services.train.timeout);
 const hotelClient = createServiceClient(config.services.hotel.baseUrl, config.services.hotel.timeout);
+const adminClient = createServiceClient(config.services.admin.baseUrl, config.services.admin.timeout);
 
 /**
  * GET /api/admin/metrics
