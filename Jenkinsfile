@@ -162,6 +162,7 @@ pipeline {
                                 --dry-run=client -o yaml | kubectl apply -f -
                         """
 
+                        def failed = []
                         for (def svc : services) {
                             def jobName = "kaniko-${svc.name}-${env.BUILD_NUMBER}".replaceAll('_', '-')
                             // DEVOPS-06: Push TWO immutable+rolling tags instead of only :latest.
@@ -177,8 +178,9 @@ metadata:
   name: ${jobName}
   namespace: ${env.KANIKO_NAMESPACE}
 spec:
-  backoffLimit: 1
-  activeDeadlineSeconds: 7200
+  backoffLimit: 0
+  activeDeadlineSeconds: 2700
+  ttlSecondsAfterFinished: 3600
   template:
     spec:
       restartPolicy: Never
@@ -217,31 +219,66 @@ spec:
               - key: .dockerconfigjson
                 path: config.json
 """
-                            sh """
+                            // Build one image, streaming kaniko logs LIVE so the full build
+                            // output is always in the Jenkins console — even if Kubernetes
+                            // garbage-collects the pod afterwards. (The old version waited 45m
+                            // for a 'complete' condition that never comes on a failed job, then
+                            // fetched logs from pods that were already gone.) returnStatus records
+                            // a failing image without aborting the whole matrix, so one broken
+                            // service (e.g. frontend) no longer hides the status of the rest.
+                            def rc = sh(returnStatus: true, script: """
                                 export KUBECONFIG="\${KUBECONFIG_PATH}"
                                 export PATH="\${WORKSPACE}/bin:\${PATH}"
+                                NS="${env.KANIKO_NAMESPACE}"
+                                JOB="${jobName}"
+
                                 kubectl apply -f kaniko-job.yaml
+
+                                # From here we manage exit codes ourselves (no set -e surprises).
                                 set +e
-                                kubectl wait --for=condition=complete job/${jobName} -n ${env.KANIKO_NAMESPACE} --timeout=45m
-                                WAIT_RC=\$?
-                                set -e
-                                if [ "\$WAIT_RC" -ne 0 ]; then
-                                  echo "=== kubectl describe job/${jobName} ==="
-                                  kubectl describe job/${jobName} -n ${env.KANIKO_NAMESPACE} 2>/dev/null || true
-                                  echo "=== pods (job-name=${jobName}) ==="
-                                  kubectl get pods -n ${env.KANIKO_NAMESPACE} -l job-name=${jobName} -o wide 2>/dev/null || true
-                                  echo "=== kaniko container logs (by pod) ==="
-                                  for POD in \$(kubectl get pods -n ${env.KANIKO_NAMESPACE} -l job-name=${jobName} -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-                                    echo "--- Pod: \$POD ---"
-                                    kubectl logs -n ${env.KANIKO_NAMESPACE} "\$POD" -c kaniko --tail=500 2>/dev/null \\
-                                      || kubectl logs -n ${env.KANIKO_NAMESPACE} "\$POD" --all-containers --tail=500 2>/dev/null \\
-                                      || true
-                                  done
-                                  kubectl delete job ${jobName} -n ${env.KANIKO_NAMESPACE} --ignore-not-found || true
-                                  exit 1
+
+                                # Follow the build output in real time. --pod-running-timeout bounds
+                                # the wait for scheduling + image pull, then streams until the kaniko
+                                # container exits (no more 45-minute hang on a failed build).
+                                kubectl logs -f "job/\${JOB}" -n "\${NS}" -c kaniko --pod-running-timeout=10m
+
+                                # Authoritative result = the Job's terminal condition. Poll briefly
+                                # to avoid a race right after the pod exits.
+                                COMPLETE=""; FAILED_C=""; tries=0
+                                while [ "\$tries" -lt 20 ]; do
+                                  COMPLETE="\$(kubectl get job "\${JOB}" -n "\${NS}" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null)"
+                                  FAILED_C="\$(kubectl get job "\${JOB}" -n "\${NS}" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null)"
+                                  if [ "\${COMPLETE}" = "True" ] || [ "\${FAILED_C}" = "True" ]; then break; fi
+                                  tries=\$((tries+1)); sleep 3
+                                done
+
+                                if [ "\${COMPLETE}" = "True" ]; then
+                                  echo "=== BUILD OK: \${JOB} ==="
+                                  kubectl delete job "\${JOB}" -n "\${NS}" --ignore-not-found >/dev/null 2>&1
+                                  exit 0
                                 fi
-                                kubectl delete job ${jobName} -n ${env.KANIKO_NAMESPACE} --ignore-not-found
-                            """
+
+                                echo "=== BUILD FAILED: \${JOB} — diagnostics ==="
+                                kubectl describe job/"\${JOB}" -n "\${NS}" 2>/dev/null
+                                for POD in \$(kubectl get pods -n "\${NS}" -l job-name="\${JOB}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                                  echo "--- describe pod \${POD} (State / Reason / Exit Code / Events) ---"
+                                  kubectl describe pod "\${POD}" -n "\${NS}" 2>/dev/null
+                                  echo "--- last 300 log lines: \${POD} (fallback if the live stream missed anything) ---"
+                                  kubectl logs "\${POD}" -n "\${NS}" -c kaniko --tail=300 2>/dev/null
+                                done
+                                kubectl delete job "\${JOB}" -n "\${NS}" --ignore-not-found >/dev/null 2>&1
+                                exit 1
+                            """)
+                            if (rc != 0) {
+                                echo "❌ Kaniko build FAILED: ${svc.name}"
+                                failed << svc.name
+                            } else {
+                                echo "✅ Kaniko build OK: ${svc.name}"
+                            }
+                        }
+
+                        if (failed) {
+                            error("Kaniko build failed for: ${failed.join(', ')} — see the per-service diagnostics above.")
                         }
                     }
                 }
