@@ -21,8 +21,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: pricing-service
-        image: malikvti/pricing-service:1.0.1
-        imagePullPolicy: IfNotPresent
+        image: malikvti/pricing-service:latest
+        imagePullPolicy: Always
         envFrom:
         - configMapRef:
             name: service-urls

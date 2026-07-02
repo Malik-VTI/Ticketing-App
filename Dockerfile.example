@@ -1,15 +1,12 @@
 # ─────────────────────────────────────────────────────────────
 # Stage 1: Builder
-# Build a DYNAMICALLY linked binary so the Dynatrace OneAgent can
-# auto-inject and capture traces. A statically linked Go binary
-# (CGO_ENABLED=0) is detected as "opaque" by Dynatrace and produces
-# no traces.
+# Build a dynamically linked binary for Dynatrace OneAgent
+# auto-injection support (requires external linker + libc).
 # Reference: https://docs.dynatrace.com/docs/shortlink/go-known-limitations
 # ─────────────────────────────────────────────────────────────
 FROM golang:1.24-alpine AS builder
 
-# gcc + musl-dev are required for CGO + the external linker
-# (Alpine uses musl libc, not glibc).
+# Install gcc and musl-dev required for CGO + external linker (Alpine uses musl, not glibc)
 RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /app
@@ -22,35 +19,37 @@ RUN go mod download
 COPY . .
 
 # Build a dynamically linked binary:
-#   CGO_ENABLED=1      → enables cgo (required for external linking)
-#   -linkmode=external → force the system (musl) linker so libc is
-#                        initialized at runtime, which Dynatrace OneAgent needs.
+#   CGO_ENABLED=1     → enables cgo (required for external linking)
+#   -linkmode=external → forces use of the system (musl) linker
+#                        so that libc is correctly initialized at runtime,
+#                        which is what Dynatrace OneAgent requires.
 RUN CGO_ENABLED=1 GOOS=linux go build \
       -ldflags="-linkmode=external" \
-      -o main \
-      ./cmd/api
+      -o beego-app \
+      main.go
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2: Final image
 # Alpine provides musl libc — required by Dynatrace OneAgent.
 # ─────────────────────────────────────────────────────────────
-FROM alpine:3.20
-
-# ca-certificates → HTTPS calls
-# libc6-compat    → compatibility shim for dynamically linked Go binaries on musl
-# tzdata          → timezone support
-RUN apk add --no-cache ca-certificates libc6-compat tzdata \
-    && adduser -D -u 1000 appuser
+FROM alpine:3.19
 
 WORKDIR /app
 
+# ca-certificates → needed for HTTPS (Swagger CDN)
+# libc6-compat    → compatibility shim for dynamically linked Go binaries on Alpine/musl
+# tzdata          → timezone support
+RUN apk add --no-cache ca-certificates libc6-compat tzdata
+
 # Copy the dynamically linked binary from builder
-COPY --from=builder /app/main .
+COPY --from=builder /app/beego-app .
 
-USER appuser
+# Copy runtime assets
+COPY --from=builder /app/conf ./conf
+COPY --from=builder /app/swagger ./swagger
 
-EXPOSE 8087
+EXPOSE 8080
 
-# Run via /bin/sh so Dynatrace OneAgent's parent-process injection is
-# satisfied (the parent process is the dynamically linked /bin/sh).
-CMD ["/bin/sh", "-c", "./main"]
+# Run via /bin/sh so Dynatrace OneAgent's parent-process injection
+# is satisfied (the parent process is dynamically linked /bin/sh)
+CMD ["/bin/sh", "-c", "./beego-app"]

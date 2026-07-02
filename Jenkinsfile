@@ -291,6 +291,17 @@ spec:
                             echo "Applying manifests from the 'deployments' directory..."
                             kubectl apply -f deployments/
 
+                            # All deployments use :latest + imagePullPolicy: Always. A plain
+                            # `kubectl apply` won't re-pull when the manifest is unchanged, so we
+                            # force a restart to roll out the freshly built (non-root) :latest images.
+                            echo "Restarting deployments to pull the freshly built images..."
+                            kubectl rollout restart deployment -n ticketing-app
+
+                            echo "Waiting for rollouts to complete..."
+                            for d in $(kubectl get deploy -n ticketing-app -o name); do
+                                kubectl rollout status "$d" -n ticketing-app --timeout=180s || true
+                            done
+
                             echo "Deployment Complete! Checking Pod status:"
                             kubectl get pods -n ticketing-app
                         '''

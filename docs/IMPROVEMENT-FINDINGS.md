@@ -198,7 +198,7 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Lokasi:** `03-authentication`, `05-flight`, `06-train`, `09-notification`, `14-hotel` (semua `:latest` + `IfNotPresent`)
 - **Masalah:** Kombinasi ini → node tidak akan pull image baru meski sudah di-push ulang.
 - **Rekomendasi:** Konsisten pakai versioned tag + `imagePullPolicy: Always` (seperti booking/api-gateway/frontend/payment yang sudah benar).
-- **Status:** `[x]` SELESAI (2026-06-17) — `imagePullPolicy: Always` diset pada 5 deployment `:latest` (03, 05, 06, 09, 14). Tagging versioned penuh dari sisi CI ditangani DEVOPS-06 (push `:${BUILD_NUMBER}` + `:latest`).
+- **Status:** `[x]` SELESAI (2026-06-17) — **semua 12 deployment distandarkan ke `:latest` + `imagePullPolicy: Always`**, dan Jenkins Deploy menambah `kubectl rollout restart` + `rollout status`. Alasan: Jenkins hanya build `:latest`(+`:${BUILD_NUMBER}`), jadi deployment ber-tag `:1.0.x` lama akan menarik image root lama → crashloop dgn securityContext non-root. Trade-off: pinning versi dilepas demi alur CI yg konsisten; `:${BUILD_NUMBER}` tetap ada di registry untuk rollback/traceability.
 
 ### `DEVOPS-02` — Tidak ada `securityContext` / `runAsNonRoot`
 - **Severity:** High (terverifikasi — tidak ada satupun di `deployments/`)
@@ -231,7 +231,7 @@ Beberapa klaim awal **diluruskan** setelah verifikasi langsung:
 - **Severity:** Medium
 - **Lokasi:** `deployments/13-ingress.yaml`
 - **Rekomendasi:** Tambah TLS (cert-manager), gunakan `ingressClassName` (bukan annotation lama), tambah rate-limit annotation.
-- **Status:** `[x]` SELESAI (2026-06-17) — `13-ingress.yaml`: annotation usang `kubernetes.io/ingress.class` → field `ingressClassName: nginx`; ditambah `spec.tls` (host `ticketing-app.local` → secret `ticketing-tls`) + annotation `cert-manager.io/cluster-issuer: letsencrypt-prod`. Rules HTTP dipertahankan. ⚠️ Butuh cert-manager + ClusterIssuer; bila belum ada, HTTP tetap jalan & TLS aktif setelah cert tersedia.
+- **Status:** `[x]` SELESAI (2026-06-17) — `13-ingress.yaml`: annotation usang `kubernetes.io/ingress.class` → field `ingressClassName: nginx`. **cert-manager DIHAPUS** (per keputusan). TLS tidak diaktifkan (HTTP-only); cara enable TLS manual tanpa cert-manager (buat secret `ticketing-tls` sendiri) didokumentasikan sebagai komentar di file. Rules HTTP dipertahankan.
 
 ### `DEVOPS-08` — nginx frontend kurang security header
 - **Severity:** Low-Medium
