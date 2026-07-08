@@ -191,6 +191,22 @@ spec:
             - "--context-sub-path=${svc.path}"
             - "--destination=${destVersioned}"
             - "--destination=${destLatest}"
+            # --- Docker Hub egress hardening (added 2026-07-08) ---
+            # This cluster's egress to Docker Hub (registry-1.docker.io / auth.docker.io /
+            # the Docker Hub CDN) is DEGRADED: ~10s TLS handshakes and connection resets on
+            # sustained layer transfers, which is what killed builds 16 ("failed to get
+            # filesystem from image: ... connection reset by peer", i/o timeouts, and 45m
+            # DeadlineExceeded hangs). Egress to gcr.io is healthy (<1s), so pull base
+            # images through the mirror.gcr.io Docker Hub pull-through cache to bypass the
+            # broken path. Falls back to docker.io automatically on a mirror miss.
+            - "--registry-mirror=mirror.gcr.io"
+            # Retry transient network failures WITHIN the build instead of failing the
+            # whole Job. image-fs-extract-retry directly covers the "Unpacking rootfs ...
+            # failed to get filesystem from image" reset seen on admin-service. push-retry
+            # covers the final push, which still targets the (degraded) Docker Hub.
+            - "--image-download-retry=6"
+            - "--image-fs-extract-retry=6"
+            - "--push-retry=10"
             - "--verbosity=info"
           env:
             - name: DOCKER_CONFIG
