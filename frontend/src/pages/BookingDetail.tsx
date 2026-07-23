@@ -1,10 +1,91 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { bookingAPI, Booking } from '../services/api'
+import { bookingAPI, flightAPI, trainAPI, Booking, BookingItem, FlightSchedule, TrainSchedule } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import Skeleton from '../components/Skeleton'
+import { CalendarEvent, downloadICS, googleCalendarUrl } from '../utils/calendar'
 import './BookingDetail.css'
+
+interface ItemEnrichment {
+  headline: string
+  sub?: string
+  departure?: string
+  arrival?: string
+  checkIn?: string
+  checkOut?: string
+  event?: CalendarEvent
+}
+
+const tripDescription = (bookingRef: string, extra: string[]): string =>
+  [`Booking ${bookingRef}`, ...extra].filter(Boolean).join('\n')
+
+const buildFlightEnrichment = (bookingRef: string, item: BookingItem, s: FlightSchedule): ItemEnrichment => ({
+  headline: `${s.airlineName} ${s.flightNumber}`,
+  sub: `${s.originCity} (${s.originAirportCode}) → ${s.destinationCity} (${s.destinationAirportCode})`,
+  departure: s.departureTime,
+  arrival: s.arrivalTime,
+  event: {
+    uid: `${bookingRef}-${item.id}@ticketing-app`,
+    title: `✈️ ${s.airlineName} ${s.flightNumber} · ${s.originAirportCode}→${s.destinationAirportCode}`,
+    description: tripDescription(bookingRef, [
+      item.metadata?.seat_numbers?.length ? `Seats: ${item.metadata.seat_numbers.join(', ')}` : '',
+      item.metadata?.passenger_names?.length ? `Passengers: ${item.metadata.passenger_names.join(', ')}` : '',
+    ]),
+    location: `${s.originAirportName} (${s.originAirportCode})`,
+    start: s.departureTime,
+    end: s.arrivalTime,
+    allDay: false,
+  },
+})
+
+const buildTrainEnrichment = (bookingRef: string, item: BookingItem, s: TrainSchedule): ItemEnrichment => ({
+  headline: `${s.operator} ${s.trainNumber}`,
+  sub: `${s.departureCity} (${s.departureStationCode}) → ${s.arrivalCity} (${s.arrivalStationCode})`,
+  departure: s.departureTime,
+  arrival: s.arrivalTime,
+  event: {
+    uid: `${bookingRef}-${item.id}@ticketing-app`,
+    title: `🚆 ${s.operator} ${s.trainNumber} · ${s.departureStationCode}→${s.arrivalStationCode}`,
+    description: tripDescription(bookingRef, [
+      item.metadata?.seat_numbers?.length ? `Seats: ${item.metadata.seat_numbers.join(', ')}` : '',
+      item.metadata?.passenger_names?.length ? `Passengers: ${item.metadata.passenger_names.join(', ')}` : '',
+    ]),
+    location: `${s.departureStationName} (${s.departureStationCode})`,
+    start: s.departureTime,
+    end: s.arrivalTime,
+    allDay: false,
+  },
+})
+
+const buildHotelEnrichment = (bookingRef: string, item: BookingItem): ItemEnrichment => {
+  const ci = item.metadata?.check_in_date
+  const co = item.metadata?.check_out_date
+  const headline = item.metadata?.hotel_name || 'Hotel stay'
+  const roomType = item.metadata?.room_type_name
+  const enr: ItemEnrichment = {
+    headline,
+    sub: [item.metadata?.hotel_city, roomType].filter(Boolean).join(' · ') || undefined,
+    checkIn: ci,
+    checkOut: co,
+  }
+  if (ci && co) {
+    enr.event = {
+      uid: `${bookingRef}-${item.id}@ticketing-app`,
+      title: `🏨 ${headline}`,
+      description: tripDescription(bookingRef, [
+        roomType ? `Room: ${roomType}` : '',
+        item.metadata?.room_numbers?.length ? `Room no: ${item.metadata.room_numbers.join(', ')}` : '',
+        item.metadata?.passenger_names?.length ? `Guests: ${item.metadata.passenger_names.join(', ')}` : '',
+      ]),
+      location: item.metadata?.hotel_city,
+      start: ci,
+      end: co,
+      allDay: true,
+    }
+  }
+  return enr
+}
 
 const BookingDetail = () => {
   const { id } = useParams<{ id: string }>()
@@ -15,6 +96,7 @@ const BookingDetail = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [enriched, setEnriched] = useState<Record<string, ItemEnrichment>>({})
 
   const loadBooking = useCallback(async () => {
     if (!id) return
@@ -68,6 +150,43 @@ const BookingDetail = () => {
       if (interval) clearInterval(interval);
     };
   }, [booking?.status, id]);
+
+  // Resolve each item's schedule so we can render a real e-ticket and build
+  // calendar events (flight/train departure times aren't stored on the booking).
+  const bookingId = booking?.id
+  useEffect(() => {
+    if (!booking) return
+    const currentBooking = booking
+    let active = true
+    const run = async () => {
+      const entries = await Promise.all(
+        currentBooking.items.map(async (item): Promise<[string, ItemEnrichment] | null> => {
+          try {
+            if (item.item_type === 'flight') {
+              const s = await flightAPI.getScheduleById(item.item_ref_id)
+              return [item.id, buildFlightEnrichment(currentBooking.booking_reference, item, s)]
+            }
+            if (item.item_type === 'train') {
+              const s = await trainAPI.getScheduleById(item.item_ref_id)
+              return [item.id, buildTrainEnrichment(currentBooking.booking_reference, item, s)]
+            }
+            return [item.id, buildHotelEnrichment(currentBooking.booking_reference, item)]
+          } catch {
+            return null // schedule unavailable — fall back to raw item display
+          }
+        })
+      )
+      if (!active) return
+      const map: Record<string, ItemEnrichment> = {}
+      for (const e of entries) if (e) map[e[0]] = e[1]
+      setEnriched(map)
+    }
+    run()
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingId])
 
   const handleCancel = () => {
     if (!booking) return
@@ -197,12 +316,53 @@ const BookingDetail = () => {
         <div className="booking-items-section">
           <h3>Booking Items ({booking.items.length})</h3>
           <div className="items-list">
-            {booking.items.map((item, index) => (
+            {booking.items.map((item, index) => {
+              const enr = enriched[item.id]
+              return (
               <div key={item.id} className="item-card">
                 <div className="item-header">
                   <span className="item-number">Item {index + 1}</span>
                   <span className="item-type">{item.item_type.toUpperCase()}</span>
                 </div>
+                {enr && (
+                  <div className="trip-summary">
+                    <div className="trip-headline">{enr.headline}</div>
+                    {enr.sub && <div className="trip-route">{enr.sub}</div>}
+                    {enr.departure && enr.arrival && (
+                      <div className="trip-times">
+                        <span>{formatDate(enr.departure)}</span>
+                        <span className="trip-arrow">→</span>
+                        <span>{formatDate(enr.arrival)}</span>
+                      </div>
+                    )}
+                    {enr.checkIn && enr.checkOut && (
+                      <div className="trip-times">
+                        <span>Check-in {enr.checkIn}</span>
+                        <span className="trip-arrow">→</span>
+                        <span>Check-out {enr.checkOut}</span>
+                      </div>
+                    )}
+                    {booking.status === 'confirmed' && enr.event && (
+                      <div className="calendar-actions">
+                        <a
+                          className="btn-calendar"
+                          href={googleCalendarUrl(enr.event)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          📅 Add to Google Calendar
+                        </a>
+                        <button
+                          type="button"
+                          className="btn-calendar btn-calendar-outline"
+                          onClick={() => downloadICS([enr.event!], `${booking.booking_reference}-${item.item_type}`)}
+                        >
+                          ⬇️ Download .ics
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="item-details">
                   <div className="item-detail-row">
                     <span className="detail-label">Reference ID:</span>
@@ -255,11 +415,29 @@ const BookingDetail = () => {
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
         <div className="booking-actions-section">
+          {booking.status === 'confirmed' &&
+            Object.values(enriched).filter((e) => e.event).length > 1 && (
+              <button
+                type="button"
+                className="btn-secondary-large"
+                onClick={() =>
+                  downloadICS(
+                    Object.values(enriched)
+                      .map((e) => e.event)
+                      .filter(Boolean) as CalendarEvent[],
+                    `${booking.booking_reference}-itinerary`
+                  )
+                }
+              >
+                📅 Add all to calendar (.ics)
+              </button>
+            )}
           {booking.status === 'pending' && (
             showCancelConfirm ? (
               <div className="cancel-confirm-inline">

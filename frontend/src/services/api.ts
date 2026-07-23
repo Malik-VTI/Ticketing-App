@@ -480,6 +480,11 @@ export interface BookingMetadata {
   passenger_names?: string[]
   check_in_date?: string
   check_out_date?: string
+  // Denormalized hotel labels captured at booking time (item_ref_id is a
+  // roomTypeId, which the catalog API can't resolve back to a hotel).
+  hotel_name?: string
+  hotel_city?: string
+  room_type_name?: string
 }
 
 export interface BookingItem {

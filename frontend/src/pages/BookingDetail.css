@@ -288,3 +288,76 @@
 .btn-secondary-large:hover {
   background-color: #5a6268;
 }
+
+/* Trip summary (e-ticket) + calendar actions */
+.trip-summary {
+  margin: 0 0 1rem 0;
+  padding: 1rem 1.25rem;
+  background: #eef4ff;
+  border: 1px solid #cfe0ff;
+  border-radius: 8px;
+}
+
+.trip-headline {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a3d7c;
+}
+
+.trip-route {
+  margin-top: 0.25rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.trip-times {
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  color: #444;
+  font-size: 0.95rem;
+}
+
+.trip-arrow {
+  color: #007bff;
+  font-weight: 700;
+}
+
+.calendar-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.btn-calendar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  background-color: #1a73e8;
+  color: #fff;
+  border: 1px solid #1a73e8;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-calendar:hover {
+  background-color: #1558b0;
+}
+
+.btn-calendar-outline {
+  background-color: transparent;
+  color: #1a73e8;
+}
+
+.btn-calendar-outline:hover {
+  background-color: #eaf1fe;
+  color: #1558b0;
+}
