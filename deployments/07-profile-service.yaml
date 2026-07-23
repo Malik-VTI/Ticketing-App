@@ -21,8 +21,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: profile-service
-        image: malikvti/profile-service:latest
-        imagePullPolicy: Always
+        image: malikvti/profile-service:v1.1.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8085
           name: http

@@ -23,8 +23,8 @@ spec:
       - name: dockerhub-credentials
       containers:
       - name: api-gateway
-        image: malikvti/api-gateway:latest
-        imagePullPolicy: Always
+        image: malikvti/api-gateway:v1.1.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

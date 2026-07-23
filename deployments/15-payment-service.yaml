@@ -23,8 +23,8 @@ spec:
       - name: dockerhub-credentials
       containers:
       - name: payment-service
-        image: malikvti/payment-service:latest
-        imagePullPolicy: Always
+        image: malikvti/payment-service:v1.1.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8089
           name: http

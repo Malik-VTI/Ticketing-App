@@ -21,8 +21,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: train-service
-        image: malikvti/train-service:latest
-        imagePullPolicy: Always
+        image: malikvti/train-service:v1.1.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8084
           name: http
