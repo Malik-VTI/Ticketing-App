@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { adminAPI } from '../services/api'
+import React, { useState, useEffect } from 'react'
+import { adminAPI, flightAPI, Airport, Airline } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -14,6 +14,21 @@ const AdminAddData: React.FC = () => {
     train: { trainNumber: '', name: '', type: 'Express' },
     hotel: { name: '', city: '', address: '', rating: 5, description: '' }
   })
+
+  const [airlines, setAirlines] = useState<Airline[]>([])
+  const [airports, setAirports] = useState<Airport[]>([])
+
+  useEffect(() => {
+    let active = true
+    Promise.all([flightAPI.getAirlines(), flightAPI.getAirports()])
+      .then(([al, ap]) => {
+        if (!active) return
+        setAirlines(al.content || [])
+        setAirports(ap.content || [])
+      })
+      .catch(() => { /* leave dropdowns empty on failure; admin can refresh */ })
+    return () => { active = false }
+  }, [])
 
   const handleChange = (type: keyof typeof formData, field: string, value: any) => {
     setFormData(prev => ({
@@ -61,16 +76,31 @@ const AdminAddData: React.FC = () => {
                 <input type="text" value={formData.flight.flightNumber} onChange={(e) => handleChange('flight', 'flightNumber', e.target.value)} required placeholder="GA-123" />
               </div>
               <div className="form-group">
-                <label>Airline ID (UUID)</label>
-                <input type="text" value={formData.flight.airlineId} onChange={(e) => handleChange('flight', 'airlineId', e.target.value)} required />
+                <label>Airline</label>
+                <select value={formData.flight.airlineId} onChange={(e) => handleChange('flight', 'airlineId', e.target.value)} required>
+                  <option value="" disabled>Select airline…</option>
+                  {airlines.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
-                <label>Departure Airport ID</label>
-                <input type="text" value={formData.flight.departureAirportId} onChange={(e) => handleChange('flight', 'departureAirportId', e.target.value)} required />
+                <label>Departure Airport</label>
+                <select value={formData.flight.departureAirportId} onChange={(e) => handleChange('flight', 'departureAirportId', e.target.value)} required>
+                  <option value="" disabled>Select departure airport…</option>
+                  {airports.map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} — {a.name} ({a.city})</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
-                <label>Arrival Airport ID</label>
-                <input type="text" value={formData.flight.arrivalAirportId} onChange={(e) => handleChange('flight', 'arrivalAirportId', e.target.value)} required />
+                <label>Arrival Airport</label>
+                <select value={formData.flight.arrivalAirportId} onChange={(e) => handleChange('flight', 'arrivalAirportId', e.target.value)} required>
+                  <option value="" disabled>Select arrival airport…</option>
+                  {airports.map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} — {a.name} ({a.city})</option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

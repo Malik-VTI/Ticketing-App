@@ -17,6 +17,17 @@ const fetchAirports = async () => {
   });
 };
 
+const fetchAirlines = async () => {
+  return proxyRequest(flightClient, 'GET', '/admin/flights/airlines', {
+    params: {
+      page: 0,
+      size: 1000,
+      sortBy: 'name',
+      direction: 'ASC',
+    },
+  });
+};
+
 // GET /api/flights/schedules
 router.get('/schedules', async (req, res) => {
   try {
@@ -115,6 +126,16 @@ router.get('/search', async (req, res) => {
 router.get('/airports', async (req, res) => {
   try {
     const data = await fetchAirports();
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 500).json(error.data || { error: error.message });
+  }
+});
+
+// GET /api/flights/airlines
+router.get('/airlines', async (req, res) => {
+  try {
+    const data = await fetchAirlines();
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json(error.data || { error: error.message });
