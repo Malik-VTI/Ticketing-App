@@ -219,6 +219,12 @@ export interface Airport {
   country: string
 }
 
+export interface Airline {
+  id: string
+  code: string
+  name: string
+}
+
 export const flightAPI = {
   getSchedulesPage: async (params: {
     page?: number
@@ -245,6 +251,18 @@ export const flightAPI = {
 
   getAirports: async (): Promise<PaginatedResponse<Airport>> => {
     const response = await api.get<PaginatedResponse<Airport>>('/flights/airports', {
+      params: {
+        page: 0,
+        size: 1000,
+        sortBy: 'name',
+        direction: 'ASC',
+      },
+    })
+    return response.data
+  },
+
+  getAirlines: async (): Promise<PaginatedResponse<Airline>> => {
+    const response = await api.get<PaginatedResponse<Airline>>('/flights/airlines', {
       params: {
         page: 0,
         size: 1000,
