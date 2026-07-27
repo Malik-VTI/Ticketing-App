@@ -1,0 +1,19 @@
+{
+  "name": "ticketing.pax.children",
+  "enabled": true,
+  "dataType": "INTEGER",
+  "normalization": "ORIGINAL",
+  "aggregation": "SUM",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "children",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

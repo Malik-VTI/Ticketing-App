@@ -1,0 +1,19 @@
+{
+  "name": "ticketing.hotel.checkout",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "ORIGINAL",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "checkout",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

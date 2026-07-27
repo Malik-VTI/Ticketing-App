@@ -1,0 +1,43 @@
+{
+  "name": "ticketing.user.id",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "ORIGINAL",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": true,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "RESPONSE_HEADER",
+      "parameterName": "X-DT-User-Id",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "processGroup": "PROCESS_GROUP-9051E7B5BD369D9A" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "REQUEST_HEADER",
+      "parameterName": "X-User-Id",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "processGroup": "PROCESS_GROUP-DD2686746189F59D" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "REQUEST_HEADER",
+      "parameterName": "X-User-Id",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "processGroup": "PROCESS_GROUP-B8670D3CC625F871" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "REQUEST_HEADER",
+      "parameterName": "X-User-Id",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "processGroup": "PROCESS_GROUP-1466683B89B48C50" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

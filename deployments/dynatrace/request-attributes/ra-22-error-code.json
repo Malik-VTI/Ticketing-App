@@ -1,0 +1,19 @@
+{
+  "name": "ticketing.error.code",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "TO_LOWER_CASE",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "RESPONSE_HEADER",
+      "parameterName": "X-DT-Error-Code",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

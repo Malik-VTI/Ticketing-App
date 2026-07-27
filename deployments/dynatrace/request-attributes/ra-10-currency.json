@@ -1,0 +1,27 @@
+{
+  "name": "ticketing.currency",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "TO_UPPER_CASE",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "currency",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "RESPONSE_HEADER",
+      "parameterName": "X-DT-Currency",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

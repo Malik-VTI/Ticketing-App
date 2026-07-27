@@ -1,0 +1,31 @@
+{
+  "name": "ticketing-app",
+  "description": "Menandai seluruh entity di namespace ticketing-app agar bisa dipakai sebagai scope request attribute",
+  "rules": [
+    {
+      "type": "ME",
+      "enabled": true,
+      "valueFormat": null,
+      "valueNormalization": "Leave text as-is",
+      "attributeRule": {
+        "entityType": "PROCESS_GROUP",
+        "pgToServicePropagation": true,
+        "pgToHostPropagation": false,
+        "hostToPGPropagation": false,
+        "serviceToPGPropagation": false,
+        "serviceToHostPropagation": false,
+        "azureToPGPropagation": false,
+        "azureToServicePropagation": false,
+        "conditions": [
+          {
+            "key": "PROCESS_GROUP_PREDEFINED_METADATA",
+            "dynamicKey": "KUBERNETES_NAMESPACE",
+            "operator": "EQUALS",
+            "stringValue": "ticketing-app",
+            "caseSensitive": true
+          }
+        ]
+      }
+    }
+  ]
+}
