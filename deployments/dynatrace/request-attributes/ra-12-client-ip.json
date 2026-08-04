@@ -1,0 +1,16 @@
+{
+  "name": "ticketing.client.ip",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "ORIGINAL",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": true,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "CLIENT_IP",
+      "scope": { "tagOfProcessGroup": "ticketing-app" }
+    }
+  ]
+}

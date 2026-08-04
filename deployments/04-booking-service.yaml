@@ -23,8 +23,8 @@ spec:
       - name: dockerhub-credentials
       containers:
       - name: booking-service
-        image: malikvti/booking-service:latest
-        imagePullPolicy: Always
+        image: malikvti/booking-service:v1.1.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
           name: http

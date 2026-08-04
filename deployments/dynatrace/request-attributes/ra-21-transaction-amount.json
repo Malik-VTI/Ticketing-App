@@ -1,0 +1,19 @@
+{
+  "name": "ticketing.transaction.amount",
+  "enabled": true,
+  "dataType": "DOUBLE",
+  "normalization": "ORIGINAL",
+  "aggregation": "SUM",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "RESPONSE_HEADER",
+      "parameterName": "X-DT-Amount",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

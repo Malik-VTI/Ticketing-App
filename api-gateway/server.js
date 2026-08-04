@@ -6,6 +6,7 @@ const config = require('./config/config');
 const routes = require('./routes');
 const openapiSpec = require('./openapi');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { dtAttributes } = require('./middleware/dtAttributes');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -76,6 +77,11 @@ app.get('/api/docs.json', (req, res) => {
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
   customSiteTitle: 'Ticketing App API Gateway — Docs',
 }));
+
+// Dynatrace request attributes (docs/DYNATRACE-REQUEST-ATTRIBUTES.md) — memasang
+// response header X-DT-* dari field bisnis. Harus terpasang SEBELUM routes agar
+// res.json sempat dibungkus.
+app.use(dtAttributes);
 
 // API routes
 app.use('/api', routes);

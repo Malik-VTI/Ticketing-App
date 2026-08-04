@@ -1,0 +1,27 @@
+{
+  "name": "ticketing.pax.adults",
+  "enabled": true,
+  "dataType": "INTEGER",
+  "normalization": "ORIGINAL",
+  "aggregation": "SUM",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "adults",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "guests",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

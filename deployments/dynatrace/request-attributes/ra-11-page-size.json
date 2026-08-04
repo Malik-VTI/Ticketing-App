@@ -1,0 +1,27 @@
+{
+  "name": "ticketing.page.size",
+  "enabled": true,
+  "dataType": "INTEGER",
+  "normalization": "ORIGINAL",
+  "aggregation": "MAXIMUM",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "size",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "limit",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

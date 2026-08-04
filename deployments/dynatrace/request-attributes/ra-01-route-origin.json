@@ -1,0 +1,35 @@
+{
+  "name": "ticketing.route.origin",
+  "enabled": true,
+  "dataType": "STRING",
+  "normalization": "TO_UPPER_CASE",
+  "aggregation": "ALL_DISTINCT_VALUES",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "from",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "origin",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    },
+    {
+      "enabled": true,
+      "source": "QUERY_PARAMETER",
+      "parameterName": "originName",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}

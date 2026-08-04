@@ -21,8 +21,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: authentication-service
-        image: malikvti/authentication-service:latest
-        imagePullPolicy: Always
+        image: malikvti/authentication-service:v1.1.0
+        imagePullPolicy: IfNotPresent
         envFrom:
         - configMapRef:
             name: service-urls

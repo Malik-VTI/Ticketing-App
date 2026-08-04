@@ -1,0 +1,19 @@
+{
+  "name": "ticketing.booking.item_count",
+  "enabled": true,
+  "dataType": "INTEGER",
+  "normalization": "ORIGINAL",
+  "aggregation": "SUM",
+  "confidential": false,
+  "skipPersonalDataMasking": false,
+  "dataSources": [
+    {
+      "enabled": true,
+      "source": "RESPONSE_HEADER",
+      "parameterName": "X-DT-Item-Count",
+      "capturingAndStorageLocation": "CAPTURE_AND_STORE_ON_SERVER",
+      "scope": { "tagOfProcessGroup": "ticketing-app" },
+      "valueProcessing": { "trim": true }
+    }
+  ]
+}
