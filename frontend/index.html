@@ -5,7 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ticketing Application</title>
-    <script type="text/javascript" src="https://js-cdn.dynatrace.com/jstag/17f2114f5d1/bf40580vys/a66c9feb5a735316_complete.js" crossorigin="anonymous"></script>
+    <!-- Dynatrace RUM is injected automatically by the OneAgent (cloud-native full-stack)
+         at the nginx/web-server layer. Do NOT hardcode a manual/CDN RUM tag here:
+         two agents then load on the same page (manual CDN + OneAgent auto-injection),
+         which conflict and cause RUM sessions to fail to register in Dynatrace. -->
   </head>
   <body>
     <div id="root"></div>
