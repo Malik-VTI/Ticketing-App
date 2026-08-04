@@ -1,0 +1,878 @@
+{
+  "annotations": [],
+  "importedWithCode": false,
+  "layouts": {
+    "0": {
+      "h": 4,
+      "w": 24,
+      "x": 0,
+      "y": 0
+    },
+    "1": {
+      "h": 2,
+      "w": 24,
+      "x": 0,
+      "y": 4
+    },
+    "10": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 25
+    },
+    "11": {
+      "h": 7,
+      "w": 12,
+      "x": 12,
+      "y": 25
+    },
+    "12": {
+      "h": 2,
+      "w": 24,
+      "x": 0,
+      "y": 32
+    },
+    "13": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 34
+    },
+    "14": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 34
+    },
+    "15": {
+      "h": 4,
+      "w": 6,
+      "x": 12,
+      "y": 34
+    },
+    "16": {
+      "h": 4,
+      "w": 6,
+      "x": 18,
+      "y": 34
+    },
+    "17": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 38
+    },
+    "18": {
+      "h": 7,
+      "w": 6,
+      "x": 12,
+      "y": 38
+    },
+    "19": {
+      "h": 7,
+      "w": 6,
+      "x": 18,
+      "y": 38
+    },
+    "2": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 6
+    },
+    "20": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 45
+    },
+    "21": {
+      "h": 7,
+      "w": 12,
+      "x": 12,
+      "y": 45
+    },
+    "22": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 52
+    },
+    "23": {
+      "h": 7,
+      "w": 12,
+      "x": 12,
+      "y": 52
+    },
+    "24": {
+      "h": 2,
+      "w": 24,
+      "x": 0,
+      "y": 59
+    },
+    "25": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 61
+    },
+    "26": {
+      "h": 7,
+      "w": 12,
+      "x": 12,
+      "y": 61
+    },
+    "27": {
+      "h": 7,
+      "w": 24,
+      "x": 0,
+      "y": 68
+    },
+    "3": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 6
+    },
+    "4": {
+      "h": 4,
+      "w": 6,
+      "x": 12,
+      "y": 6
+    },
+    "5": {
+      "h": 4,
+      "w": 6,
+      "x": 18,
+      "y": 6
+    },
+    "6": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 10
+    },
+    "7": {
+      "h": 7,
+      "w": 6,
+      "x": 12,
+      "y": 10
+    },
+    "8": {
+      "h": 7,
+      "w": 6,
+      "x": 18,
+      "y": 10
+    },
+    "9": {
+      "h": 8,
+      "w": 24,
+      "x": 0,
+      "y": 17
+    }
+  },
+  "settings": {
+    "defaultTimeframe": {
+      "enabled": true,
+      "value": {
+        "from": "now()-24h",
+        "to": "now()"
+      }
+    }
+  },
+  "tiles": {
+    "0": {
+      "content": "# Ticketing App — Pengalaman Pengguna \u0026 Bisnis\n\nSeluruh angka bisnis di halaman ini berasal dari **22 request attribute** yang ditangkap OneAgent di\nservice **api-gateway** (Node.js) — satu-satunya titik tangkap yang tersedia, karena booking, payment,\nauth, hotel, dan notification ditulis dengan Go dan Go tidak mendukung request attribute.\nDefinisi: `deployments/dynatrace/request-attributes/` · Dokumentasi: `docs/DYNATRACE-REQUEST-ATTRIBUTES.md`\n\nBagian **Pengalaman Pengguna** dan **Bisnis** membaca tabel `spans`, jadi keduanya hanya terisi bila ada\ntrafik API sungguhan — health probe Kubernetes tidak melewati `res.json()` gateway sehingga tidak membawa\natribut apa pun. Bagian **Kesehatan Platform** memakai metrik bawaan dan selalu terisi.\n",
+      "title": "",
+      "type": "markdown"
+    },
+    "1": {
+      "content": "## 1 · Pengalaman Pengguna — apa yang dirasakan pemakai aplikasi",
+      "title": "",
+      "type": "markdown"
+    },
+    "10": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.error.code`)\n| expand error_code = `request_attribute.ticketing.error.code`\n| expand operation  = `request_attribute.ticketing.api.operation`\n| summarize { occurrences   = count(),\n              hidden_in_2xx = countIf(http.response.status_code \u003c 400) },\n            by:{error_code, operation}\n| sort occurrences desc\n| limit 25\n",
+      "title": "Kode error bisnis — termasuk yang tersembunyi di balik HTTP 2xx",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "columnWidths": {
+            "[\"error_code\"]": 220,
+            "[\"operation\"]": 280
+          },
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "11": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.route.origin`)\n| expand origin      = `request_attribute.ticketing.route.origin`\n| expand destination = `request_attribute.ticketing.route.destination`\n| summarize { searches = count(),\n              p90      = percentile(duration, 90),\n              p99      = percentile(duration, 99) },\n            by:{origin, destination}\n| sort p90 desc\n| limit 25\n",
+      "title": "Rute pencarian paling lambat",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "12": {
+      "content": "## 2 · Bisnis — nilai yang dihasilkan aplikasi",
+      "title": "",
+      "type": "markdown"
+    },
+    "13": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.transaction.amount`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/payments\"\n| expand payment_status = `request_attribute.ticketing.payment.status`\n| filter payment_status == \"succeeded\"\n| summarize revenue = sum(`request_attribute.ticketing.transaction.amount`)\n",
+      "title": "Pendapatan (pembayaran berhasil)",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "singleValue": {
+          "label": "Pendapatan",
+          "recordField": "revenue",
+          "showLabel": true
+        }
+      }
+    },
+    "14": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/bookings\"\n| filter http.response.status_code \u003c 400\n| summarize bookings = count()\n",
+      "title": "Booking berhasil dibuat",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "singleValue": {
+          "label": "Booking",
+          "recordField": "bookings",
+          "showLabel": true
+        }
+      }
+    },
+    "15": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.payment.status`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/payments\"\n| expand payment_status = `request_attribute.ticketing.payment.status`\n| summarize succeeded = countIf(payment_status == \"succeeded\"), total = count()\n| fieldsAdd success_rate = if(total \u003e 0, then: 100.0 * succeeded / total, else: 0.0)\n| fields success_rate\n",
+      "title": "Keberhasilan pembayaran",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "coloring": {
+          "colorRules": [
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#c62239"
+              },
+              "field": "success_rate",
+              "value": -1
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#eea53c"
+              },
+              "field": "success_rate",
+              "value": 90
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#2f6862"
+              },
+              "field": "success_rate",
+              "value": 97
+            }
+          ]
+        },
+        "singleValue": {
+          "label": "% berhasil",
+          "recordField": "success_rate",
+          "showLabel": true
+        }
+      }
+    },
+    "16": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.transaction.amount`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/payments\"\n| expand payment_status = `request_attribute.ticketing.payment.status`\n| filter payment_status == \"succeeded\"\n| summarize aov = avg(`request_attribute.ticketing.transaction.amount`)\n",
+      "title": "Nilai transaksi rata-rata",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "singleValue": {
+          "label": "Rata-rata",
+          "recordField": "aov",
+          "showLabel": true
+        }
+      }
+    },
+    "17": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.transaction.amount`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/payments\"\n| expand payment_status = `request_attribute.ticketing.payment.status`\n| filter payment_status == \"succeeded\"\n| expand payment_method = `request_attribute.ticketing.payment.method`\n| makeTimeseries revenue = sum(`request_attribute.ticketing.transaction.amount`),\n                 by:{payment_method}, time: start_time\n",
+      "title": "Pendapatan per metode pembayaran",
+      "type": "data",
+      "visualization": "areaChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "axes": {
+          "yAxis": {
+            "label": "Pendapatan"
+          }
+        },
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          },
+          "stacked": true
+        }
+      }
+    },
+    "18": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.booking.type`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/bookings\"\n| expand booking_type = `request_attribute.ticketing.booking.type`\n| summarize bookings = count(), by:{booking_type}\n| sort bookings desc\n",
+      "title": "Komposisi booking",
+      "type": "data",
+      "visualization": "pieChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "19": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.payment.method`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/payments\"\n| expand payment_method = `request_attribute.ticketing.payment.method`\n| summarize payments = count(), by:{payment_method}\n| sort payments desc\n",
+      "title": "Komposisi metode bayar",
+      "type": "data",
+      "visualization": "pieChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "2": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| summarize requests = count()\n",
+      "title": "Permintaan API",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "singleValue": {
+          "label": "Permintaan",
+          "recordField": "requests",
+          "showLabel": true
+        }
+      }
+    },
+    "20": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.booking.type`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| filter operation == \"POST /api/bookings\"\n| expand booking_type = `request_attribute.ticketing.booking.type`\n| summarize { bookings    = count(),\n              gross_value = sum(`request_attribute.ticketing.transaction.amount`),\n              avg_value   = avg(`request_attribute.ticketing.transaction.amount`),\n              items_sold  = sum(`request_attribute.ticketing.booking.item_count`) },\n            by:{booking_type}\n| sort gross_value desc\n",
+      "title": "Nilai \u0026 volume per tipe booking",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "21": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.booking.reference`)\n| expand booking_reference = `request_attribute.ticketing.booking.reference`\n| expand booking_status    = `request_attribute.ticketing.booking.status`\n| expand booking_type      = `request_attribute.ticketing.booking.type`\n| summarize bookings = countDistinct(booking_reference), by:{booking_status, booking_type}\n| sort bookings desc\n| limit 20\n",
+      "title": "Status booking (dihitung unik per kode booking)",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "22": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.route.origin`)\n| expand origin      = `request_attribute.ticketing.route.origin`\n| expand destination = `request_attribute.ticketing.route.destination`\n| summarize { searches   = count(),\n              passengers = sum(`request_attribute.ticketing.pax.adults`),\n              children   = sum(`request_attribute.ticketing.pax.children`) },\n            by:{origin, destination}\n| sort searches desc\n| limit 25\n",
+      "title": "Rute paling diminati",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "23": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.coupon.code`)\n| expand coupon    = `request_attribute.ticketing.coupon.code`\n| expand operation = `request_attribute.ticketing.api.operation`\n| summarize uses = count(), by:{coupon, operation}\n| sort uses desc\n| limit 25\n",
+      "title": "Pemakaian kupon",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "columnWidths": {
+            "[\"operation\"]": 280
+          },
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "24": {
+      "content": "## 3 · Kesehatan Platform — metrik bawaan, terisi meski tanpa trafik pengguna",
+      "title": "",
+      "type": "markdown"
+    },
+    "25": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "timeseries requests = sum(dt.service.request.count),\n  by:{dt.entity.service},\n  filter: in(dt.entity.service, classicEntitySelector(\"type(SERVICE),tag(ticketing-app)\"))\n| fieldsAdd service = entityName(dt.entity.service)\n| fieldsRemove dt.entity.service\n| fieldsAdd _rank = arraySum(requests)\n| sort _rank desc\n| limit 8\n| fieldsRemove _rank\n",
+      "title": "Lalu lintas per service",
+      "type": "data",
+      "visualization": "lineChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "axes": {
+          "yAxis": {
+            "label": "Permintaan"
+          }
+        },
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "26": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "timeseries p90 = percentile(dt.service.request.response_time, 90),\n  by:{dt.entity.service},\n  filter: in(dt.entity.service, classicEntitySelector(\"type(SERVICE),tag(ticketing-app)\"))\n| fieldsAdd service = entityName(dt.entity.service)\n| fieldsRemove dt.entity.service\n| fieldsAdd _rank = arrayAvg(p90)\n| sort _rank desc\n| limit 8\n| fieldsRemove _rank\n",
+      "title": "Waktu respons p90 per service",
+      "type": "data",
+      "visualization": "lineChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "axes": {
+          "yAxis": {
+            "label": "p90"
+          }
+        },
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "27": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "timeseries { requests = sum(dt.service.request.count),\n             failures = sum(dt.service.request.failure_count),\n             rt       = avg(dt.service.request.response_time) },\n  by:{dt.entity.service},\n  filter: in(dt.entity.service, classicEntitySelector(\"type(SERVICE),tag(ticketing-app)\"))\n| fieldsAdd service            = entityName(dt.entity.service),\n            total_requests     = arraySum(requests),\n            total_failures     = arraySum(failures),\n            avg_response_ms    = arrayAvg(rt) / 1000\n| fieldsAdd failure_rate = if(total_requests \u003e 0, then: 100.0 * total_failures / total_requests, else: 0.0)\n| fields service, total_requests, total_failures, failure_rate, avg_response_ms\n| sort total_requests desc\n",
+      "thresholds": [
+        {
+          "field": "failure_rate",
+          "id": 1,
+          "isEnabled": true,
+          "rules": [
+            {
+              "color": {
+                "Default": "#2f6862"
+              },
+              "comparator": "\u003e=",
+              "id": 0,
+              "value": 0
+            },
+            {
+              "color": {
+                "Default": "#eea53c"
+              },
+              "comparator": "\u003e",
+              "id": 1,
+              "value": 1
+            },
+            {
+              "color": {
+                "Default": "#c62239"
+              },
+              "comparator": "\u003e",
+              "id": 2,
+              "value": 5
+            }
+          ]
+        }
+      ],
+      "title": "Rapor service ticketing-app",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "columnWidths": {
+            "[\"service\"]": 320
+          },
+          "linewrapEnabled": false
+        }
+      }
+    },
+    "3": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| summarize failed = countIf(http.response.status_code \u003e= 400 or request.is_failed == true),\n            total  = count()\n| fieldsAdd failure_rate = if(total \u003e 0, then: 100.0 * failed / total, else: 0.0)\n| fields failure_rate\n",
+      "title": "Tingkat kegagalan HTTP",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "coloring": {
+          "colorRules": [
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#2f6862"
+              },
+              "field": "failure_rate",
+              "value": -1
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#eea53c"
+              },
+              "field": "failure_rate",
+              "value": 1
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#c62239"
+              },
+              "field": "failure_rate",
+              "value": 5
+            }
+          ]
+        },
+        "singleValue": {
+          "label": "% gagal",
+          "recordField": "failure_rate",
+          "showLabel": true
+        }
+      }
+    },
+    "4": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| summarize p90 = percentile(duration, 90)\n",
+      "title": "Waktu respons p90",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "singleValue": {
+          "label": "p90",
+          "recordField": "p90",
+          "showLabel": true
+        }
+      }
+    },
+    "5": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.error.code`)\n| summarize business_errors = count()\n",
+      "title": "Kegagalan bisnis",
+      "type": "data",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "coloring": {
+          "colorRules": [
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#2f6862"
+              },
+              "field": "business_errors",
+              "value": -1
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#eea53c"
+              },
+              "field": "business_errors",
+              "value": 0
+            },
+            {
+              "colorMode": "custom-color",
+              "comparator": "\u003e",
+              "customColor": {
+                "Default": "#c62239"
+              },
+              "field": "business_errors",
+              "value": 20
+            }
+          ]
+        },
+        "singleValue": {
+          "label": "error bisnis",
+          "recordField": "business_errors",
+          "showLabel": true
+        }
+      }
+    },
+    "6": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| makeTimeseries requests = count(), by:{operation}, time: start_time\n| fieldsAdd _rank = arraySum(requests)\n| sort _rank desc\n| limit 8\n| fieldsRemove _rank\n",
+      "title": "Lalu lintas per operasi API (8 teratas)",
+      "type": "data",
+      "visualization": "areaChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "axes": {
+          "yAxis": {
+            "label": "Permintaan"
+          }
+        },
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          },
+          "stacked": true
+        }
+      }
+    },
+    "7": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| fieldsAdd experience = if(duration \u003c= 500ms, then: \"1 · Puas (\u003c 0,5 s)\",\n                         else: if(duration \u003c= 2s, then: \"2 · Toleran (0,5–2 s)\",\n                                                  else: \"3 · Frustrasi (\u003e 2 s)\"))\n| summarize requests = count(), by:{experience}\n| sort experience asc\n",
+      "title": "Sebaran pengalaman",
+      "type": "data",
+      "visualization": "pieChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "8": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.error.code`)\n| expand error_code = `request_attribute.ticketing.error.code`\n| makeTimeseries errors = count(), by:{error_code}, time: start_time\n| fieldsAdd _rank = arraySum(errors)\n| sort _rank desc\n| limit 6\n| fieldsRemove _rank\n",
+      "title": "Tren error bisnis",
+      "type": "data",
+      "visualization": "lineChart",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "axes": {
+          "yAxis": {
+            "label": "Kejadian"
+          }
+        },
+        "chartSettings": {
+          "legend": {
+            "position": "bottom",
+            "showLegend": true
+          }
+        }
+      }
+    },
+    "9": {
+      "davis": {
+        "davisVisualization": {
+          "isAvailable": true
+        },
+        "enabled": false
+      },
+      "query": "fetch spans\n| filter isNotNull(`request_attribute.ticketing.api.operation`)\n| expand operation = `request_attribute.ticketing.api.operation`\n| summarize { requests = count(),\n              p50    = percentile(duration, 50),\n              p90    = percentile(duration, 90),\n              p99    = percentile(duration, 99),\n              failed = countIf(http.response.status_code \u003e= 400 or request.is_failed == true) },\n            by:{operation}\n| fieldsAdd failure_rate = 100.0 * failed / requests\n| fields operation, requests, p50, p90, p99, failed, failure_rate\n| sort requests desc\n| limit 30\n",
+      "thresholds": [
+        {
+          "field": "failure_rate",
+          "id": 1,
+          "isEnabled": true,
+          "rules": [
+            {
+              "color": {
+                "Default": "#2f6862"
+              },
+              "comparator": "\u003e=",
+              "id": 0,
+              "value": 0
+            },
+            {
+              "color": {
+                "Default": "#eea53c"
+              },
+              "comparator": "\u003e",
+              "id": 1,
+              "value": 1
+            },
+            {
+              "color": {
+                "Default": "#c62239"
+              },
+              "comparator": "\u003e",
+              "id": 2,
+              "value": 5
+            }
+          ]
+        }
+      ],
+      "title": "Rapor per perjalanan pengguna — volume, latensi, kegagalan",
+      "type": "data",
+      "visualization": "table",
+      "visualizationSettings": {
+        "autoSelectVisualization": false,
+        "table": {
+          "columnWidths": {
+            "[\"operation\"]": 320
+          },
+          "linewrapEnabled": false
+        }
+      }
+    }
+  },
+  "variables": [],
+  "version": 21
+}

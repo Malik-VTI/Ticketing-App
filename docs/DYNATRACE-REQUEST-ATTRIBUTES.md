@@ -10,7 +10,7 @@
 
 ## Status Implementasi
 
-Terakhir diperbarui **2026-07-27**.
+Terakhir diperbarui **2026-07-28**.
 
 | Langkah | Status | Bukti / lokasi |
 |---------|--------|----------------|
@@ -22,8 +22,17 @@ Terakhir diperbarui **2026-07-27**.
 | 4.5 Definisi Batch B (10 RA) | ✅ **selesai** | `deployments/dynatrace/request-attributes/ra-13..ra-22*.json` |
 | — Script penerap & pengekspor | ✅ **selesai** | `scripts/dt-apply-request-attributes.ps1`, `scripts/dt-export-request-attributes.ps1` |
 | **Menerapkan 22 RA ke tenant** | ✅ **selesai** | 21 dibuat + 1 diperbarui, 0 gagal. Tenant kini punya 22 RA berawalan `ticketing.` |
-| **Build & deploy `api-gateway` v1.1.1** | ⏳ **belum** | Satu-satunya penghalang tersisa untuk Batch B |
+| **Build & deploy `api-gateway` v1.1.1** | ✅ **selesai** | 2 pod `malikvti/api-gateway:v1.1.1` Running. Header `X-DT-Operation` & `X-DT-Error-Code` terkonfirmasi pada respons live lewat ingress (2026-07-28) |
+| **Dashboard UX + bisnis** | ✅ **selesai** | `deployments/dynatrace/dashboards/ticketing-ux-business.yaml` — lihat [Bagian 6.6](#66-dashboard-pengalaman-pengguna--bisnis) |
 | 4.6 Batch C (method parameter Java) | ⏳ **manual** | Lewat wizard UI, lalu `dt-export-request-attributes.ps1` |
+
+### Hasil verifikasi (2026-07-28)
+
+```
+X-DT-Operation: GET /api/search/flights   -> middleware hidup di gateway v1.1.1 (live, lewat ingress)
+X-DT-Error-Code: internal_error           -> penangkapan error bisnis bekerja
+24/24 query tile dashboard lolos `dtctl verify query`, tanpa peringatan
+```
 
 ### Hasil verifikasi (2026-07-27)
 
@@ -43,15 +52,30 @@ Nilai request attribute yang **benar-benar tertangkap** belum bisa dibuktikan le
 
 ### Yang tersisa
 
-```powershell
-# Batch B baru terisi setelah gateway membawa middleware X-DT-*
-docker build -t malikvti/api-gateway:v1.1.1 ./api-gateway
-docker push malikvti/api-gateway:v1.1.1
-kubectl -n ticketing-app set image deployment/api-gateway api-gateway=malikvti/api-gateway:v1.1.1
-kubectl -n ticketing-app rollout status deployment/api-gateway
+Seluruh rantai teknisnya sudah lengkap: definisi RA aktif, gateway v1.1.1 jalan, header
+`X-DT-*` terbukti keluar. **Yang belum ada adalah trafik bisnisnya.**
+
+```dql
+-- 7 hari terakhir, request non-health yang sampai ke service Go:
+--   booking 44 · hotel 24 · auth 14 · payment 7
+-- Sisanya (±52.000/hari per service) adalah health probe Kubernetes,
+-- dan probe tidak melewati res.json() gateway sehingga tidak membawa RA.
 ```
 
-> Batch A (12 RA dari query parameter) **sudah aktif sekarang** — tidak menunggu rollout, karena tidak butuh perubahan kode apa pun.
+Akibatnya bagian 1 & 2 dashboard ([6.6](#66-dashboard-pengalaman-pengguna--bisnis)) masih
+kosong. Yang mengisinya adalah pemakaian aplikasi sungguhan — lewat UI, uji manual, atau
+generator trafik yang menjalankan alur daftar → cari → booking → bayar.
+
+> Catatan terpisah, ditemukan saat verifikasi 2026-07-28: `GET /api/search/flights`
+> mengembalikan **HTTP 500 `internal_error`**, sementara `GET /api/flights/airports` normal.
+>
+> **Terjawab & diperbaiki 2026-08-04.** Bukan bug pricing-service. `SearchController` dipetakan ke
+> `@RequestMapping("/api/search")`, sedangkan gateway memanggil `/search/flights` — Spring
+> tidak menemukan mapping, jatuh ke static resource handler, dan `NoResourceFoundException`
+> di-render sebagai 500. Diperbaiki di `api-gateway/routes/search.js`, dirilis sebagai
+> `malikvti/api-gateway:v1.1.2`. Ketiga endpoint search kini `200` + data, dan header
+> `X-DT-Operation` tetap terpasang. Rencana trafik yang mengisi RA ini ada di
+> [`DYNATRACE-SYNTHETIC-MONITORS.md`](DYNATRACE-SYNTHETIC-MONITORS.md).
 
 ---
 
@@ -981,6 +1005,67 @@ User lapor "booking TKT-8F21C9 gagal"
 ```
 
 Tanpa RA, satu-satunya cara adalah menebak lewat rentang waktu dan menyisir log.
+
+### 6.6 Dashboard pengalaman pengguna & bisnis
+
+`deployments/dynatrace/dashboards/ticketing-ux-business.yaml` — 28 tile dalam tiga bagian:
+
+| Bagian | Sumber | Isi |
+|--------|--------|-----|
+| 1 · Pengalaman Pengguna | `spans` + RA | volume, tingkat kegagalan, p90, jumlah error bisnis; lalu lintas & sebaran pengalaman (puas/toleran/frustrasi); rapor per operasi API dengan p50/p90/p99; kode error bisnis termasuk yang tersembunyi di balik HTTP 2xx; rute pencarian paling lambat |
+| 2 · Bisnis | `spans` + RA | pendapatan, jumlah booking, tingkat keberhasilan pembayaran, nilai transaksi rata-rata; pendapatan per metode bayar; komposisi booking & metode bayar; nilai per tipe booking; status booking unik per kode; rute paling diminati; pemakaian kupon |
+| 3 · Kesehatan Platform | metrik bawaan | lalu lintas & p90 per service, rapor service — di-scope lewat `classicEntitySelector("type(SERVICE),tag(ticketing-app)")` |
+
+Request attribute muncul di Grail sebagai field span **`request_attribute.<nama>`**. Karena
+seluruh RA bertipe STRING memakai agregasi `ALL_DISTINCT_VALUES`, tipenya **array** — jadi
+harus di-`expand` dulu sebelum dipakai sebagai dimensi:
+
+```dql
+fetch spans
+| filter isNotNull(`request_attribute.ticketing.booking.type`)
+| expand booking_type = `request_attribute.ticketing.booking.type`
+| summarize bookings = count(), by:{booking_type}
+```
+
+RA bertipe angka (`transaction.amount`, `pax.*`, `booking.item_count`) memakai agregasi
+`SUM`/`MAXIMUM` sehingga sudah skalar dan bisa langsung di-`sum()`.
+
+Menerapkan dan memperbarui — idempoten selama field `id` di file dipertahankan:
+
+```powershell
+dtctl apply -f deployments/dynatrace/dashboards/ticketing-ux-business.yaml --plain
+```
+
+> ⚠️ **Dashboard yang dibuat lewat `dtctl` tidak akan terlihat di akun Anda.** Pemiliknya
+> adalah service account di balik platform token (`svc_codex_dtctl SERVICE_IDENTITY`,
+> `dtctl auth whoami`), dan dokumennya `Private: true` — artinya hanya identitas token itu
+> yang bisa membukanya. Field `isPrivate` **tidak ikut ter-apply**: visibilitas dokumen
+> diatur terpisah dari kontennya.
+>
+> Dua jalan keluar:
+>
+> 1. **Unggah sendiri lewat UI** — `ticketing-ux-business.dashboard.json` di folder yang sama
+>    adalah objek `content` dashboard, siap di-*upload* lewat Dashboards → **Upload**.
+>    Hasilnya dimiliki akun Anda. Nama dashboard mengikuti nama file.
+> 2. **Beri token izin berbagi** — tambahkan scope `document:environment-shares:read` +
+>    `document:environment-shares:write` (untuk berbagi ke seluruh environment) atau
+>    `document:direct-shares:*` (untuk berbagi ke user tertentu), lalu:
+>
+>    ```powershell
+>    dtctl apply -f deployments/dynatrace/dashboards/ticketing-ux-business.yaml `
+>      --share-environment read-write --plain
+>    ```
+>
+>    Tanpa scope itu perintahnya gagal dengan `failed to list environment shares: API error (403)`.
+>    `dtctl share dashboard <id> --user <id>` juga tidak bisa dipakai sebagai jalan pintas:
+>    flag `--user` minta **SSO user ID**, bukan email, sementara `dtctl get users` dan
+>    `dtctl get groups` sama-sama balik 403 dengan token ini.
+
+> **Memvalidasi query tanpa scope `storage:spans:read`.** `dtctl query` atas `fetch spans`
+> gagal dengan `NOT_AUTHORIZED_FOR_TABLE`, tetapi **`dtctl verify query -f x.dql`** memeriksa
+> sintaks di sisi server tanpa menyentuh storage — jadi tetap bisa dipakai untuk memvalidasi
+> seluruh query tile. Yang tidak bisa dibuktikan lewat jalur ini hanyalah apakah query
+> mengembalikan baris.
 
 ---
 
