@@ -6,13 +6,19 @@ const config = require('../config/config');
 
 const pricingClient = createServiceClient(config.services.pricing.baseUrl, config.services.pricing.timeout);
 
+// SearchController di pricing-service dipetakan ke @RequestMapping("/api/search"),
+// berbeda dari PricingController yang memakai "/pricing" tanpa awalan. Prefiks ini
+// harus ikut dikirim — tanpa itu Spring jatuh ke static resource handler dan
+// membalas 500 NoResourceFoundException, bukan 404.
+const SEARCH_BASE = '/api/search';
+
 /**
  * GET /api/search/flights
  * Search flights
  */
 router.get('/flights', optionalAuth, async (req, res) => {
   try {
-    const data = await proxyRequest(pricingClient, 'GET', '/search/flights', {
+    const data = await proxyRequest(pricingClient, 'GET', `${SEARCH_BASE}/flights`, {
       params: req.query,
       userId: req.user?.id,
       userEmail: req.user?.email,
@@ -29,7 +35,7 @@ router.get('/flights', optionalAuth, async (req, res) => {
  */
 router.get('/trains', optionalAuth, async (req, res) => {
   try {
-    const data = await proxyRequest(pricingClient, 'GET', '/search/trains', {
+    const data = await proxyRequest(pricingClient, 'GET', `${SEARCH_BASE}/trains`, {
       params: req.query,
       userId: req.user?.id,
       userEmail: req.user?.email,
@@ -46,7 +52,7 @@ router.get('/trains', optionalAuth, async (req, res) => {
  */
 router.get('/hotels', optionalAuth, async (req, res) => {
   try {
-    const data = await proxyRequest(pricingClient, 'GET', '/search/hotels', {
+    const data = await proxyRequest(pricingClient, 'GET', `${SEARCH_BASE}/hotels`, {
       params: req.query,
       userId: req.user?.id,
       userEmail: req.user?.email,

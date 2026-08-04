@@ -24,11 +24,16 @@ spec:
         image: malikvti/profile-service:v1.1.0
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8085
+        - containerPort: 8090
           name: http
         env:
+        # 8090 adalah port yang diniatkan untuk profile-service: sesuai default
+        # aplikasi (src/main/resources/application.yaml -> ${PROFILE_SERVICE_PORT:8090}),
+        # ConfigMap service-urls, default api-gateway/config/config.js, dan
+        # docker-compose. Nilai 8085 sebelumnya bertabrakan dengan hotel-service
+        # dan membuat gateway tidak pernah bisa menjangkau service ini.
         - name: PROFILE_SERVICE_PORT
-          value: "8085"
+          value: "8090"
         envFrom:
         - configMapRef:
             name: service-urls
@@ -49,13 +54,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /profile/health
-            port: 8085
+            port: 8090
           initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /profile/health
-            port: 8085
+            port: 8090
           initialDelaySeconds: 30
           periodSeconds: 5
 ---
@@ -69,8 +74,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 8085
-    targetPort: 8085
+  - port: 8090
+    targetPort: 8090
     protocol: TCP
     name: http
   selector:

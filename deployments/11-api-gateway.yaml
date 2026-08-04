@@ -23,7 +23,9 @@ spec:
       - name: dockerhub-credentials
       containers:
       - name: api-gateway
-        image: malikvti/api-gateway:v1.1.0
+        # v1.1.1 = middleware request attribute X-DT-* (dtAttributes.js)
+        # v1.1.2 = perbaikan path search ke pricing-service (/api/search/*)
+        image: malikvti/api-gateway:v1.1.2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
