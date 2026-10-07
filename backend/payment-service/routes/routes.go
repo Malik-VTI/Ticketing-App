@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"payment-service/logging"
 	"time"
 
 	"payment-service/database"
@@ -19,7 +20,8 @@ import (
 )
 
 func SetupRoutes(paymentRepo repository.PaymentRepository) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery(), logging.Middleware())
 
 	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
 	if allowedOrigin == "" {

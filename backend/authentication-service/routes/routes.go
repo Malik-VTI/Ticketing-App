@@ -1,23 +1,25 @@
 package routes
 
 import (
+	"authentication-service/logging"
 	"context"
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"authentication-service/config"
 	"authentication-service/database"
 	_ "authentication-service/docs"
 	"authentication-service/handlers"
 	"authentication-service/middleware"
 	"authentication-service/repository"
+	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRoutes(cfg *config.Config, userRepo repository.UserRepository) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery(), logging.Middleware())
 
 	// Health check endpoint (liveness)
 	router.GET("/health", func(c *gin.Context) {
@@ -62,4 +64,3 @@ func SetupRoutes(cfg *config.Config, userRepo repository.UserRepository) *gin.En
 
 	return router
 }
-

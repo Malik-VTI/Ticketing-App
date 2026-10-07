@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
+	"payment-service/logging"
 	"payment-service/models"
 	"payment-service/service"
 
@@ -61,11 +63,38 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 
 	payment, err := h.paymentService.CreatePayment(userID, &req)
 	if err != nil {
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelError, logging.TypeBusiness,
+			"payment.create.failed", "payment could not be created",
+			slog.String("booking.id", req.BookingID.String()),
+			slog.Float64("payment.amount", req.Amount),
+			slog.String("payment.method", string(req.PaymentMethod)),
+			slog.String("error.message", err.Error()))
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: err.Error()})
 		return
 	}
 
+	if payment.Status == models.StatusSucceeded {
+		logging.Business(c, "payment.succeeded", "payment succeeded", paymentAttrs(payment)...)
+	} else {
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelWarn, logging.TypeBusiness,
+			"payment.failed", "payment declined by provider", paymentAttrs(payment)...)
+	}
+
 	c.JSON(http.StatusCreated, payment)
+}
+
+// paymentAttrs adalah field bisnis standar untuk event pembayaran.
+func paymentAttrs(p *models.PaymentDTO) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("payment.id", p.ID.String()),
+		slog.String("payment.status", string(p.Status)),
+		slog.String("payment.method", string(p.PaymentMethod)),
+		slog.Float64("payment.amount", p.Amount),
+		slog.String("payment.currency", p.Currency),
+		slog.String("booking.id", p.BookingID.String()),
+		slog.String("user.id", p.UserID.String()),
+	}
+	return append(attrs, logging.DemoSensitive("payment")...)
 }
 
 // GetPayment handles GET /payments/:id
@@ -129,6 +158,10 @@ func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 
 	payment, err := h.paymentService.RefundPayment(id, userID)
 	if err != nil {
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelWarn, logging.TypeBusiness,
+			"payment.refund.rejected", "refund rejected",
+			slog.String("payment.id", id.String()),
+			slog.String("error.message", err.Error()))
 		switch err.Error() {
 		case "payment not found":
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "not_found", Message: "Payment not found"})
@@ -141,6 +174,8 @@ func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 		}
 		return
 	}
+
+	logging.Business(c, "payment.refunded", "payment refunded", paymentAttrs(payment)...)
 
 	c.JSON(http.StatusOK, payment)
 }
@@ -155,5 +190,3 @@ func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 func (h *PaymentHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "payment-service"})
 }
-
-

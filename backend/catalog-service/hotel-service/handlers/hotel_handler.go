@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"hotel-service/database"
+	"hotel-service/logging"
 	"hotel-service/models"
 	"hotel-service/repository"
 
@@ -104,6 +106,15 @@ func (h *HotelHandler) GetHotels(c *gin.Context) {
 	if totalPages == 0 {
 		totalPages = 1
 	}
+
+	logging.Business(c, "hotel.searched", "hotel search executed",
+		slog.String("search.city", searchReq.City),
+		slog.String("search.checkin", searchReq.CheckIn),
+		slog.String("search.checkout", searchReq.CheckOut),
+		slog.Int("search.guests", searchReq.Guests),
+		slog.Int("search.page", page),
+		slog.Int("search.result_count", len(hotelDTOs)),
+		slog.Int("search.total_count", total))
 
 	c.JSON(http.StatusOK, gin.H{
 		"content":       hotelDTOs,
@@ -293,6 +304,18 @@ func (h *HotelHandler) GetRooms(c *gin.Context) {
 		})
 	}
 
+	availableCount := 0
+	for _, r := range availableRooms {
+		availableCount += r.AvailableCount
+	}
+	logging.Business(c, "hotel.availability.checked", "hotel room availability checked",
+		slog.String("hotel.id", hotelID.String()),
+		slog.String("search.checkin", checkInStr),
+		slog.String("search.checkout", checkOutStr),
+		slog.String("search.guests", guestsStr),
+		slog.Int("hotel.room_type_count", len(availableRooms)),
+		slog.Int("hotel.available_rooms", availableCount))
+
 	c.JSON(http.StatusOK, availableRooms)
 }
 
@@ -329,8 +352,18 @@ func (h *HotelHandler) ReserveRooms(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
+	reserveAttrs := []slog.Attr{
+		slog.String("hotel.id", c.Param("id")),
+		slog.String("hotel.room_type_id", req.RoomTypeID.String()),
+		slog.String("booking.checkin", req.CheckIn),
+		slog.String("booking.checkout", req.CheckOut),
+		slog.Int("booking.quantity", req.Quantity),
+	}
 	roomNumbers, err := h.roomRepo.ReserveRooms(tx, req.Quantity, req.RoomTypeID)
 	if err != nil {
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelWarn, logging.TypeBusiness,
+			"hotel.rooms.reserve.failed", "room reservation failed (insufficient availability)",
+			append(reserveAttrs, slog.String("error.message", err.Error()))...)
 		c.JSON(http.StatusConflict, models.ErrorResponse{
 			Error:   "reservation_failed",
 			Message: err.Error(),
@@ -345,6 +378,9 @@ func (h *HotelHandler) ReserveRooms(c *gin.Context) {
 		})
 		return
 	}
+
+	logging.Business(c, "hotel.rooms.reserved", "hotel rooms reserved",
+		append(reserveAttrs, slog.Int("hotel.rooms_reserved", len(roomNumbers)))...)
 
 	c.JSON(http.StatusOK, models.ReserveRoomsResponse{
 		RoomNumbers: roomNumbers,
@@ -397,6 +433,11 @@ func (h *HotelHandler) ReleaseRooms(c *gin.Context) {
 		})
 		return
 	}
+
+	logging.Business(c, "hotel.rooms.released", "hotel rooms released",
+		slog.String("hotel.id", c.Param("id")),
+		slog.String("hotel.room_type_id", req.RoomTypeID.String()),
+		slog.Int("hotel.rooms_released", len(req.RoomNumbers)))
 
 	c.JSON(http.StatusOK, gin.H{"status": "released"})
 }

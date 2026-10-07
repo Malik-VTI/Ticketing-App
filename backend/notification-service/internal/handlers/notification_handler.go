@@ -1,11 +1,13 @@
 package handlers
 
 import (
-	"log"
+	"context"
+	"log/slog"
 	"net/http"
 
 	"notification-service/internal/models"
 	"notification-service/internal/service"
+	"notification-service/logging"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,10 +43,17 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 	}
 
 	// Fire-and-forget: send asynchronously so the response is fast
+	reqLogger := logging.From(c)
 	go func() {
+		attrs := notificationAttrs(&req)
 		if err := h.emailService.Send(&req); err != nil {
-			log.Printf("[notification] Failed to send %s email to %s: %v", req.Type, req.Email, err)
+			logging.Event(context.Background(), reqLogger, slog.LevelError, logging.TypeBusiness,
+				"notification.failed", "failed to send notification email",
+				append(attrs, slog.String("error.message", err.Error()))...)
+			return
 		}
+		logging.Event(context.Background(), reqLogger, slog.LevelInfo, logging.TypeBusiness,
+			"notification.sent", "notification email sent", attrs...)
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
@@ -52,6 +61,25 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 		"type":    req.Type,
 		"email":   req.Email,
 	})
+}
+
+// notificationAttrs adalah field bisnis standar untuk event notifikasi (tanpa PII).
+func notificationAttrs(req *models.SendNotificationRequest) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("notification.type", string(req.Type)),
+		slog.String("notification.channel", "email"),
+		slog.String("user.id", req.UserID.String()),
+	}
+	if req.BookingID != nil {
+		attrs = append(attrs, slog.String("booking.id", req.BookingID.String()))
+	}
+	if req.Reference != "" {
+		attrs = append(attrs, slog.String("booking.reference", req.Reference))
+	}
+	if req.Amount != nil {
+		attrs = append(attrs, slog.Float64("booking.amount", *req.Amount), slog.String("booking.currency", req.Currency))
+	}
+	return attrs
 }
 
 // Health reports service liveness.

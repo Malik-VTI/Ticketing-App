@@ -1,15 +1,14 @@
 package main
 
 import (
+	"booking-service/logging"
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -27,17 +26,8 @@ import (
 // @description Booking service (Gin) — bookings, seat lock, transactional outbox.
 // @BasePath /
 func main() {
-	// Configure structured (JSON) logging as the default logger.
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+	// Logging JSON terstandar (docs/LOGGING-STANDARD.md).
+	logging.Init("booking-service")
 
 	// Load .env file from project root
 	workDir, _ := os.Getwd()

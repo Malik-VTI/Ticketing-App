@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
-	"log"
 	"strings"
 	"time"
 
 	"authentication-service/config"
+	"authentication-service/logging"
 	"authentication-service/models"
 	"authentication-service/repository"
 	"authentication-service/utils"
@@ -70,6 +71,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Check if user already exists
 	_, err := h.userRepo.FindByEmail(req.Email)
 	if err == nil {
+		logging.Security(c, slog.LevelWarn, "user.register.failed", "registration rejected: email already registered",
+			slog.String("auth.failure_reason", "user_exists"))
 		c.JSON(http.StatusConflict, models.ErrorResponse{
 			Error:   "user_exists",
 			Message: "User with this email already exists",
@@ -99,7 +102,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	if err := h.userRepo.Create(user); err != nil {
 		// Log underlying error so we can debug DB issues (e.g. constraint violations)
-		log.Printf("register: failed to create user email=%s: %v", req.Email, err)
+		logging.From(c).Error("register: failed to create user", slog.String("error.message", err.Error()))
 
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",
@@ -132,6 +135,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Store the refresh token in an httpOnly cookie instead of the body
 	h.setRefreshCookie(c, refreshToken)
+
+	logging.Security(c, slog.LevelInfo, "user.registered", "user registered",
+		append([]slog.Attr{slog.String("user.id", user.ID.String())}, logging.DemoSensitive("auth")...)...)
 
 	c.JSON(http.StatusCreated, models.AuthResponse{
 		AccessToken:  accessToken,
@@ -173,6 +179,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	user, err := h.userRepo.FindByEmail(req.Email)
 	if err != nil {
 		if err.Error() == "user not found" {
+			logging.Security(c, slog.LevelWarn, "user.login.failed", "login failed: unknown user",
+				slog.String("auth.failure_reason", "user_not_found"))
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error:   "invalid_credentials",
 				Message: "Invalid email or password",
@@ -189,6 +197,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Verify password
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
+		logging.Security(c, slog.LevelWarn, "user.login.failed", "login failed: wrong password",
+			append([]slog.Attr{
+				slog.String("auth.failure_reason", "invalid_password"),
+				slog.String("user.id", user.ID.String()),
+			}, logging.DemoSensitive("auth")...)...)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "invalid_credentials",
 			Message: "Invalid email or password",
@@ -220,6 +233,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Store the refresh token in an httpOnly cookie instead of the body
 	h.setRefreshCookie(c, refreshToken)
+
+	logging.Security(c, slog.LevelInfo, "user.login.succeeded", "user logged in",
+		append([]slog.Attr{slog.String("user.id", user.ID.String())}, logging.DemoSensitive("auth")...)...)
 
 	c.JSON(http.StatusOK, models.AuthResponse{
 		AccessToken:  accessToken,
@@ -265,6 +281,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Validate refresh token
 	claims, err := utils.ValidateRefreshToken(refreshTokenStr, h.config)
 	if err != nil {
+		logging.Security(c, slog.LevelWarn, "token.refresh.failed", "refresh token rejected",
+			slog.String("auth.failure_reason", "invalid_refresh_token"))
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "invalid_token",
 			Message: "Invalid or expired refresh token",
@@ -315,6 +333,9 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Rotate the refresh token in the httpOnly cookie instead of the body
 	h.setRefreshCookie(c, refreshToken)
 
+	logging.Security(c, slog.LevelInfo, "token.refreshed", "access token refreshed",
+		slog.String("user.id", user.ID.String()))
+
 	c.JSON(http.StatusOK, models.AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: "",
@@ -337,6 +358,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	h.clearRefreshCookie(c)
+	logging.Security(c, slog.LevelInfo, "user.logout", "user logged out")
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 

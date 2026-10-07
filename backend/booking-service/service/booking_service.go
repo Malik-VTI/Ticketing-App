@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"time"
 
 	"booking-service/cache"
 	"booking-service/clients"
 	bookingerrors "booking-service/errors"
+	"booking-service/logging"
 	"booking-service/models"
 	"booking-service/repository"
 
@@ -96,7 +98,7 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 		if err != nil {
 			return nil, fmt.Errorf("pricing_validation_failed: %w", err)
 		}
-		
+
 		// If the calculated total doesn't match roughly what frontend thinks, we could error.
 		// But usually we just take the backend's calculation.
 		totalAmount += calc.TotalPrice
@@ -136,7 +138,7 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 	var items []*models.BookingItem
 	for _, itemReq := range req.Items {
 		// Perform Inventory Reservation
-		
+
 		// Extract reservation details from metadata
 		var seatNumbers []string
 		var checkIn, checkOut string
@@ -174,16 +176,20 @@ func (s *bookingService) CreateBooking(userID uuid.UUID, req *models.CreateBooki
 				return nil, fmt.Errorf("flight_reservation_failed: %w", err)
 			}
 		case "hotel":
-			if checkIn == "" { checkIn = time.Now().Format("2006-01-02") }
-			if checkOut == "" { checkOut = time.Now().AddDate(0, 0, 1).Format("2006-01-02") }
-			
+			if checkIn == "" {
+				checkIn = time.Now().Format("2006-01-02")
+			}
+			if checkOut == "" {
+				checkOut = time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+			}
+
 			// Full Room Allocation logic
 			rooms, err := s.catalogClient.ReserveHotelRooms(uuid.Nil, itemReq.ItemRefID, checkIn, checkOut, itemReq.Quantity)
 			if err != nil {
 				_ = tx.Rollback()
 				return nil, fmt.Errorf("hotel_reservation_failed: %w", err)
 			}
-			
+
 			// Update the request metadata with actual allocated rooms
 			if itemReq.Metadata == nil {
 				itemReq.Metadata = &models.BookingMetadata{}
@@ -387,7 +393,19 @@ func (s *bookingService) StartExpirationWorker() {
 				continue
 			}
 			for _, b := range bookings {
-				_ = s.ExpireBooking(b.ID)
+				if err := s.ExpireBooking(b.ID); err != nil {
+					slog.Warn("failed to expire booking", slog.String("booking.id", b.ID.String()),
+						slog.String("error.message", err.Error()))
+					continue
+				}
+				logging.Event(context.Background(), slog.Default(), slog.LevelInfo, logging.TypeBusiness,
+					"booking.expired", "pending booking expired (unpaid > 30m)",
+					slog.String("booking.id", b.ID.String()),
+					slog.String("booking.reference", b.BookingReference),
+					slog.String("booking.type", b.BookingType),
+					slog.Float64("booking.amount", b.TotalAmount),
+					slog.String("booking.currency", b.Currency),
+					slog.String("user.id", b.UserID.String()))
 			}
 		}
 	}()
