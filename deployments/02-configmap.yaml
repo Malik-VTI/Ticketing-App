@@ -14,3 +14,10 @@ data:
   ADMIN_SERVICE_URL: "http://admin-service:8088"
   PAYMENT_SERVICE_URL: "http://payment-service:8089"
   PROFILE_SERVICE_URL: "http://profile-service:8090"
+  # Logging standar (docs/LOGGING-STANDARD.md) — dibaca semua service via envFrom.
+  DEPLOYMENT_ENV: "dev"
+  LOG_LEVEL: "info"
+  GIN_MODE: "release"
+  # Tambahkan credential DUMMY (nilai palsu, ditandai sensitive.dummy=true) ke
+  # event login/register/password/payment untuk demo masking di BindPlane.
+  LOG_DEMO_SENSITIVE: "true"
