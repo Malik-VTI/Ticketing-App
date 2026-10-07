@@ -1,11 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Format log standar ticketing-app (docs/LOGGING-STANDARD.md) — identik untuk
+  semua service Java dan setara dengan service Go (slog) serta api-gateway (pino).
+  MDC (request_id, trace_id, user.id, event.name, dan dt.trace_id/dt.span_id dari
+  Dynatrace OneAgent) otomatis ikut sebagai field top-level.
+-->
 <configuration>
+    <springProperty scope="context" name="SERVICE_NAME" source="spring.application.name" defaultValue="unknown-service"/>
+
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <!-- LogstashEncoder menyertakan MDC secara default; field dt.trace_id/dt.span_id
-             yang di-inject Dynatrace OneAgent akan muncul otomatis tanpa kode korelasi. -->
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <timeZone>UTC</timeZone>
+            <includeContext>false</includeContext>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <version>[ignore]</version>
+                <levelValue>[ignore]</levelValue>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <stackTrace>error.stack_trace</stackTrace>
+            </fieldNames>
+            <!-- log.type ditulis lewat provider di bawah agar ada default "app". -->
+            <excludeMdcKeyName>log.type</excludeMdcKeyName>
+            <provider class="net.logstash.logback.composite.loggingevent.LoggingEventPatternJsonProvider">
+                <pattern>{"service.name":"${SERVICE_NAME}","service.version":"${SERVICE_VERSION:-unknown}","deployment.environment":"${DEPLOYMENT_ENV:-dev}","log.type":"%mdc{log.type:-app}"}</pattern>
+            </provider>
+        </encoder>
     </appender>
-    <root level="INFO">
+
+    <root level="${LOG_LEVEL:-INFO}">
         <appender-ref ref="JSON_CONSOLE"/>
     </root>
 </configuration>

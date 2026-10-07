@@ -8,11 +8,41 @@ const openapiSpec = require('./openapi');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { dtAttributes } = require('./middleware/dtAttributes');
 const logger = require('./utils/logger');
+const { requestContext } = require('./utils/requestContext');
 
 const app = express();
 
 // Trust proxy (for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
+
+// Correlation context + access log (docs/LOGGING-STANDARD.md). Registered first
+// so every response — including health probes and 429s — gets one access line
+// carrying request_id / trace_id. Probes are logged at DEBUG only.
+app.use(requestContext);
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const status = res.statusCode;
+    const path = req.originalUrl.split('?')[0];
+    let level = 'info';
+    if (status >= 500) level = 'error';
+    else if (status >= 400) level = 'warn';
+    else if (path === '/api/health') level = 'debug';
+    logger[level]({
+      'log.type': 'access',
+      'http.request.method': req.method,
+      'url.path': path,
+      'http.route': req.route ? `${req.baseUrl}${req.route.path}` : '',
+      'http.response.status_code': status,
+      'http.response.body.size': Number(res.getHeader('content-length')) || 0,
+      duration_ms: Number(process.hrtime.bigint() - start) / 1e6,
+      'client.address': req.ip,
+      'user_agent.original': req.get('user-agent') || '',
+      ...(req.user?.id && { 'user.id': req.user.id }),
+    }, 'http request');
+  });
+  next();
+});
 
 // CORS configuration
 app.use(cors({
@@ -54,17 +84,6 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  next();
-});
-
-// Request logging middleware (structured, all environments).
-// Logs each request when its response finishes. No request/correlation IDs
-// are added here — Dynatrace OneAgent handles trace correlation.
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    logger.info({ method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - start }, 'request');
-  });
   next();
 });
 

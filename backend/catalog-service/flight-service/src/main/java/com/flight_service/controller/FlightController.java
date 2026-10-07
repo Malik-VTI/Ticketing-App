@@ -4,9 +4,13 @@ import com.flight_service.dto.FlightScheduleDTO;
 import com.flight_service.dto.FlightSeatDTO;
 import com.flight_service.dto.request.ReserveSeatsRequest;
 import com.flight_service.exception.ResourceNotFoundException;
+import com.flight_service.logging.LogEvents;
 import com.flight_service.service.FlightService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class FlightController {
+    private static final Logger log = LoggerFactory.getLogger(FlightController.class);
     private final FlightService flightService;
 
     @GetMapping("/schedules")
@@ -40,6 +45,11 @@ public class FlightController {
         // If search parameters provided, use search method
         if (origin != null && destination != null && date != null) {
             List<FlightScheduleDTO> schedules = flightService.getSchedules(origin, destination, date);
+            LogEvents.business(log, "flight.searched", "flight schedule search executed", LogEvents.fields(
+                    "search.origin_id", origin,
+                    "search.destination_id", destination,
+                    "search.date", date,
+                    "search.result_count", schedules.size()));
             return ResponseEntity.ok(schedules);
         }
         
@@ -56,6 +66,11 @@ public class FlightController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<FlightScheduleDTO> result = flightService.searchByAirportNames(
                 originName, destinationName, date);
+        LogEvents.business(log, "flight.searched", "flight search by airport name executed", LogEvents.fields(
+                "search.origin", originName,
+                "search.destination", destinationName,
+                "search.date", date,
+                "search.result_count", result.size()));
         return ResponseEntity.ok(result);
     }
 
@@ -81,10 +96,15 @@ public class FlightController {
     public ResponseEntity<?> reserveSeats(@PathVariable UUID id, @Valid @RequestBody ReserveSeatsRequest request) {
         try {
             flightService.reserveSeats(id, request.getSeatNumbers());
+            LogEvents.business(log, "flight.seats.reserved", "flight seats reserved", seatFields(id, request, null));
             return ResponseEntity.ok().build();
         } catch (IllegalStateException e) {
+            LogEvents.emit(log, Level.WARN, LogEvents.TYPE_BUSINESS, "flight.seats.reserve.failed",
+                    "seat reservation failed (seat not available)", seatFields(id, request, e));
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (ResourceNotFoundException e) {
+            LogEvents.emit(log, Level.WARN, LogEvents.TYPE_BUSINESS, "flight.seats.reserve.failed",
+                    "seat reservation failed (schedule not found)", seatFields(id, request, e));
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
@@ -93,10 +113,22 @@ public class FlightController {
     public ResponseEntity<?> releaseSeats(@PathVariable UUID id, @Valid @RequestBody ReserveSeatsRequest request) {
         try {
             flightService.releaseSeats(id, request.getSeatNumbers());
+            LogEvents.business(log, "flight.seats.released", "flight seats released", seatFields(id, request, null));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            LogEvents.emit(log, Level.ERROR, LogEvents.TYPE_BUSINESS, "flight.seats.release.failed",
+                    "seat release failed", seatFields(id, request, e));
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
+    }
+
+    private static java.util.Map<String, Object> seatFields(UUID scheduleId, ReserveSeatsRequest request, Exception e) {
+        return LogEvents.fields(
+                "flight.schedule_id", scheduleId,
+                "seat.class", request.getSeatClass(),
+                "seat.count", request.getSeatNumbers() == null ? 0 : request.getSeatNumbers().size(),
+                "seat.numbers", request.getSeatNumbers(),
+                "error.message", e == null ? null : e.getMessage());
     }
 
     @GetMapping("/health")

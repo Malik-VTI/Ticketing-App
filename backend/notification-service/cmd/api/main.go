@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
+	"notification-service/logging"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -28,17 +27,8 @@ import (
 // @description Notification service that sends booking and payment email notifications. The /notifications/send endpoint is invoked service-to-service by the booking and payment services.
 // @BasePath /
 func main() {
-	// Configure structured (JSON) logging as the default logger.
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+	// Logging JSON terstandar (docs/LOGGING-STANDARD.md).
+	logging.Init("notification-service")
 
 	workDir, _ := os.Getwd()
 	envPath := filepath.Join(workDir, "..", "..", ".env")
@@ -62,7 +52,8 @@ func main() {
 	emailSvc := service.NewEmailService()
 	handler := handlers.NewNotificationHandler(emailSvc)
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery(), logging.Middleware())
 
 	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
 	if allowedOrigin == "" {

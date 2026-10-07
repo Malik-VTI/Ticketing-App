@@ -23,12 +23,14 @@ spec:
       - name: dockerhub-credentials
       containers:
       - name: payment-service
-        image: malikvti/payment-service:v1.1.0
+        image: malikvti/payment-service:v1.2.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8089
           name: http
         env:
+        - name: SERVICE_VERSION
+          value: "v1.2.0"
         - name: PAYMENT_SERVICE_PORT
           value: "8089"
         envFrom:

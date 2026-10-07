@@ -25,12 +25,14 @@ spec:
       - name: api-gateway
         # v1.1.1 = middleware request attribute X-DT-* (dtAttributes.js)
         # v1.1.2 = perbaikan path search ke pricing-service (/api/search/*)
-        image: malikvti/api-gateway:v1.1.2
+        image: malikvti/api-gateway:v1.2.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http
         env:
+        - name: SERVICE_VERSION
+          value: "v1.2.0"
         - name: NODE_ENV
           value: "production"
         - name: PORT

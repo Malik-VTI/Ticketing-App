@@ -1,16 +1,24 @@
 const axios = require('axios');
+const { getContext } = require('./requestContext');
 
 /**
  * Create HTTP client for service communication
  */
 const createServiceClient = (baseUrl, timeout = 5000) => {
-  return axios.create({
+  const client = axios.create({
     baseURL: baseUrl,
     timeout: timeout,
     headers: {
       'Content-Type': 'application/json',
     },
   });
+  // Propagate the correlation id so downstream service logs share request_id.
+  client.interceptors.request.use((cfg) => {
+    const { request_id: requestId } = getContext();
+    if (requestId) cfg.headers['X-Request-ID'] = requestId;
+    return cfg;
+  });
+  return client;
 };
 
 /**

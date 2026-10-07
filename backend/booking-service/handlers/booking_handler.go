@@ -3,11 +3,12 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	bookingerrors "booking-service/errors"
+	"booking-service/logging"
 	"booking-service/models"
 	"booking-service/service"
 
@@ -75,6 +76,11 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 
 	booking, err := h.bookingService.CreateBooking(authenticatedUserID, &req)
 	if err != nil {
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelError, logging.TypeBusiness,
+			"booking.create.failed", "booking creation failed",
+			slog.String("booking.type", req.BookingType),
+			slog.Int("booking.item_count", len(req.Items)),
+			slog.String("error.message", err.Error()))
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",
 			Message: err.Error(),
@@ -82,7 +88,28 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 		return
 	}
 
+	logging.Business(c, "booking.created", "booking created", bookingAttrs(booking)...)
+
 	c.JSON(http.StatusCreated, booking)
+}
+
+// bookingAttrs adalah field bisnis standar untuk event booking (tanpa PII).
+func bookingAttrs(b *models.BookingDTO) []slog.Attr {
+	quantity := 0
+	for _, item := range b.Items {
+		quantity += item.Quantity
+	}
+	return []slog.Attr{
+		slog.String("booking.id", b.ID.String()),
+		slog.String("booking.reference", b.BookingReference),
+		slog.String("booking.type", b.BookingType),
+		slog.String("booking.status", b.Status),
+		slog.Float64("booking.amount", b.TotalAmount),
+		slog.String("booking.currency", b.Currency),
+		slog.Int("booking.item_count", len(b.Items)),
+		slog.Int("booking.quantity", quantity),
+		slog.String("user.id", b.UserID.String()),
+	}
 }
 
 // GetBooking handles GET /bookings/:id
@@ -321,6 +348,8 @@ func (h *BookingHandler) CancelBooking(c *gin.Context) {
 
 	// Ownership check — users may only cancel their own bookings
 	if booking.UserID != authenticatedUserID {
+		logging.Security(c, slog.LevelWarn, "booking.access.denied", "cancel attempt on booking owned by another user",
+			slog.String("booking.id", booking.ID.String()))
 		c.JSON(http.StatusForbidden, models.ErrorResponse{
 			Error:   "forbidden",
 			Message: "You do not have permission to cancel this booking",
@@ -343,6 +372,9 @@ func (h *BookingHandler) CancelBooking(c *gin.Context) {
 		})
 		return
 	}
+
+	booking.Status = "cancelled"
+	logging.Business(c, "booking.cancelled", "booking cancelled by user", bookingAttrs(booking)...)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":    "Booking cancelled successfully",
@@ -383,7 +415,8 @@ func (h *BookingHandler) ConfirmBooking(c *gin.Context) {
 		return
 	}
 	if booking.Status != "pending" {
-		log.Printf("ConfirmBooking rejected: Booking %s has status %s (expected 'pending')", id, booking.Status)
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelWarn, logging.TypeBusiness,
+			"booking.confirm.rejected", "booking confirmation rejected: booking not pending", bookingAttrs(booking)...)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid_status",
 			Message: fmt.Sprintf("Booking is not in pending state (currently %s)", booking.Status),
@@ -391,9 +424,10 @@ func (h *BookingHandler) ConfirmBooking(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Confirming booking %s...", id)
 	if err := h.bookingService.UpdateBookingStatus(id, "confirmed"); err != nil {
-		log.Printf("ConfirmBooking failed for %s: %v", id, err)
+		logging.Event(c.Request.Context(), logging.From(c), slog.LevelError, logging.TypeBusiness,
+			"booking.confirm.failed", "booking confirmation failed",
+			append(bookingAttrs(booking), slog.String("error.message", err.Error()))...)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",
 			Message: err.Error(),
@@ -401,7 +435,8 @@ func (h *BookingHandler) ConfirmBooking(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Booking %s confirmed successfully", id)
+	booking.Status = "confirmed"
+	logging.Business(c, "booking.confirmed", "booking confirmed after payment", bookingAttrs(booking)...)
 	c.JSON(http.StatusOK, gin.H{"message": "Booking confirmed", "booking_id": id.String()})
 }
 

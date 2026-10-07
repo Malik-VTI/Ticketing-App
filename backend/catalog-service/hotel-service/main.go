@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"hotel-service/logging"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -26,17 +25,8 @@ import (
 // @description Hotel catalog service exposing hotel search, room availability, rates, and room reservation/release operations for the ticketing platform.
 // @BasePath /
 func main() {
-	// Configure structured (JSON) logging as the default logger.
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+	// Logging JSON terstandar (docs/LOGGING-STANDARD.md).
+	logging.Init("hotel-service")
 
 	// Load .env file from project root
 	workDir, _ := os.Getwd()

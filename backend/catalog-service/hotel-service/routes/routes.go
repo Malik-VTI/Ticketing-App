@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"hotel-service/logging"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,8 @@ func SetupRoutes(
 	roomRepo repository.RoomRepository,
 	roomRateRepo repository.RoomRateRepository,
 ) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery(), logging.Middleware())
 
 	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
 	if allowedOrigin == "" {
@@ -63,6 +65,7 @@ func SetupRoutes(
 
 	// Admin routes
 	admin := router.Group("/admin/hotels")
+	admin.Use(logging.Audit("catalog"))
 	{
 		// Hotel CRUD
 		admin.POST("", adminHandler.CreateHotel)
@@ -87,4 +90,3 @@ func SetupRoutes(
 
 	return router
 }
-

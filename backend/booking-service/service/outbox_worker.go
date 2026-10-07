@@ -2,12 +2,14 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
+	"booking-service/logging"
 	"booking-service/repository"
 )
 
@@ -42,22 +44,26 @@ func (s *bookingService) StartOutboxWorker() {
 func (s *bookingService) processOutboxBatch() {
 	events, err := s.outboxRepo.ClaimPendingOutbox(outboxBatchSize)
 	if err != nil {
-		log.Printf("ERROR: outbox worker gagal claim pending events: %v", err)
+		slog.Error("outbox worker failed to claim pending events", slog.String("error.message", err.Error()))
 		return
 	}
 
 	for _, event := range events {
 		if err := deliverOutboxEvent(event); err != nil {
 			if markErr := s.outboxRepo.MarkOutboxFailed(event.ID, err.Error()); markErr != nil {
-				log.Printf("ERROR: outbox worker gagal menandai event %s failed: %v", event.ID, markErr)
+				slog.Error("outbox worker failed to mark event as failed", slog.String("outbox.event_id", event.ID.String()), slog.String("error.message", markErr.Error()))
 			}
-			log.Printf("WARN: outbox worker gagal kirim notifikasi event %s (booking %s, attempt %d): %v",
-				event.ID, event.BookingID, event.Attempts+1, err)
+			logging.Event(context.Background(), slog.Default(), slog.LevelWarn, logging.TypeBusiness,
+				"notification.dispatch.failed", "failed to deliver booking notification to notification-service",
+				slog.String("outbox.event_id", event.ID.String()),
+				slog.String("booking.id", event.BookingID.String()),
+				slog.Int("outbox.attempt", event.Attempts+1),
+				slog.String("error.message", err.Error()))
 			continue
 		}
 
 		if err := s.outboxRepo.MarkOutboxSent(event.ID); err != nil {
-			log.Printf("ERROR: outbox worker gagal menandai event %s sent: %v", event.ID, err)
+			slog.Error("outbox worker failed to mark event as sent", slog.String("outbox.event_id", event.ID.String()), slog.String("error.message", err.Error()))
 		}
 	}
 }

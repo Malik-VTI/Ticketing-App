@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"booking-service/logging"
 	"context"
 	"net/http"
 	"os"
@@ -23,7 +24,8 @@ func SetupRoutes(
 	bookingRepo repository.BookingRepository,
 	bookingItemRepo repository.BookingItemRepository,
 ) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery(), logging.Middleware())
 
 	// CORS allowed origin is read once from the environment (default to local host).
 	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
@@ -102,4 +104,3 @@ func SetupRoutes(
 
 	return router
 }
-

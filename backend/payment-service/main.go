@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
+	"payment-service/logging"
 	"syscall"
 	"time"
 
@@ -26,17 +25,8 @@ import (
 // @description Payment service (Gin) — payment creation, lookup, and refunds.
 // @BasePath /
 func main() {
-	// Configure structured (JSON) logging as the default logger.
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+	// Logging JSON terstandar (docs/LOGGING-STANDARD.md).
+	logging.Init("payment-service")
 
 	// Load .env from project root
 	workDir, _ := os.Getwd()

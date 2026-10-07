@@ -4,7 +4,11 @@ const logger = require('../utils/logger');
  * Global Error Handler Middleware
  */
 const errorHandler = (err, req, res, next) => {
-  logger.error({ err }, 'Error');
+  logger.error({
+    'error.type': err.name || 'Error',
+    'error.message': err.message,
+    'error.stack_trace': err.stack,
+  }, 'unhandled error');
 
   // Default error
   const status = err.status || 500;

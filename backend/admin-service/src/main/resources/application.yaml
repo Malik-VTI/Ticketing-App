@@ -1,4 +1,6 @@
 spring:
+  main:
+    banner-mode: "off"  # log stdout hanya JSON (docs/LOGGING-STANDARD.md)
   application:
     name: admin-service
   datasource:
