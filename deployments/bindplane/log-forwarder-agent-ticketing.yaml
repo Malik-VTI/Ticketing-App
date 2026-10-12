@@ -1,0 +1,102 @@
+# Usulan pengganti ConfigMap bindplane-logging/log-forwarder-agent khusus
+# ticketing-app (lihat docs/LOGGING-STANDARD.md §5).
+#
+# Beda dengan config yang berjalan sekarang:
+#  1. Hanya membaca container ticketing-app (sebelumnya: SEMUA namespace + log OS
+#     + audit kube-apiserver), dan mengabaikan job trendmicro-scan-job-*.
+#  2. Baris JSON aplikasi TIDAK lagi dibungkus jadi string di dalam field "log"
+#     (JSON di dalam JSON). Field k8s.* digabung ke objek JSON aslinya, jadi
+#     di BindPlane cukup satu kali "Parse JSON" untuk mendapat booking.id,
+#     event.name, trace_id, dll.
+#  3. Prioritas syslog mengikuti field level (ERROR/WARN/INFO).
+#
+# Pipeline log OS / audit / k8s events sengaja dilepas. Bila tetap dibutuhkan,
+# pindahkan ke pipeline terpisah agar tidak tercampur dengan log aplikasi.
+#
+# Apply:  kubectl apply -f deployments/bindplane/log-forwarder-agent-ticketing.yaml
+#         kubectl rollout restart ds/log-forwarder-agent -n bindplane-logging
+# Rollback: simpan config lama dulu ->
+#         kubectl get cm log-forwarder-agent -n bindplane-logging -o yaml > cm-backup.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-forwarder-agent
+  namespace: bindplane-logging
+data:
+  config.yaml: |
+    extensions:
+      file_storage:
+        directory: /var/lib/otelcol/storage
+        create_directory: true
+
+    receivers:
+      filelog/ticketing:
+        include: [ /var/log/pods/ticketing-app_*/*/*.log ]
+        exclude: [ /var/log/pods/ticketing-app_trendmicro-scan-job-*/*/*.log ]
+        include_file_path: true
+        start_at: end
+        storage: file_storage
+        operators:
+          - type: container
+            id: container-parser
+            add_metadata_from_filepath: true
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+        spike_limit_mib: 100
+      resource/node:
+        attributes:
+          - { key: k8s.node.name, value: "${env:K8S_NODE_NAME}", action: upsert }
+      transform/ticketing:
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["hostname"], resource.attributes["k8s.node.name"])
+              - set(attributes["appname"], attributes["k8s.container.name"])
+              # Baris JSON (semua komponen setelah docs/LOGGING-STANDARD.md):
+              # gabungkan field k8s.* ke objek aslinya, kirim sebagai satu JSON datar.
+              - merge_maps(cache, ParseJSON(body), "upsert") where IsMatch(body, "^\\s*\\{")
+              - set(cache["k8s.namespace.name"], attributes["k8s.namespace.name"]) where IsMatch(body, "^\\s*\\{")
+              - set(cache["k8s.pod.name"], attributes["k8s.pod.name"]) where IsMatch(body, "^\\s*\\{")
+              - set(cache["k8s.container.name"], attributes["k8s.container.name"]) where IsMatch(body, "^\\s*\\{")
+              - set(cache["k8s.node.name"], resource.attributes["k8s.node.name"]) where IsMatch(body, "^\\s*\\{")
+              - set(attributes["message"], String(cache)) where IsMatch(body, "^\\s*\\{")
+              # Baris non-JSON (mis. error_log nginx, panic): kirim apa adanya.
+              - set(attributes["message"], body) where not IsMatch(body, "^\\s*\\{")
+              # local0 + severity: 131=err, 132=warning, 134=info, 135=debug
+              - set(attributes["priority"], 134)
+              - set(attributes["priority"], 132) where cache["level"] == "WARN"
+              - set(attributes["priority"], 131) where cache["level"] == "ERROR"
+              - set(attributes["priority"], 131) where attributes["log.iostream"] == "stderr" and not IsMatch(body, "^\\s*\\{")
+              - set(attributes["priority"], 135) where cache["level"] == "DEBUG"
+              - set(body, attributes["message"])
+      batch:
+        timeout: 1s
+        send_batch_size: 512
+
+    exporters:
+      syslog:
+        endpoint: 10.100.33.105
+        # UDP tetap dipakai karena hanya itu yang didengar receiver saat ini.
+        # Pindah ke "tcp" (dan rfc5424) begitu receiver BindPlane membuka TCP 5140,
+        # agar pesan >1 KB tidak berisiko terpotong/hilang.
+        network: udp
+        port: 5140
+        protocol: rfc3164
+        tls:
+          insecure: true
+
+    service:
+      extensions: [ file_storage ]
+      telemetry:
+        metrics:
+          level: none
+        logs:
+          level: info
+      pipelines:
+        logs/ticketing:
+          receivers: [ filelog/ticketing ]
+          processors: [ memory_limiter, resource/node, transform/ticketing, batch ]
+          exporters: [ syslog ]
