@@ -1,22 +1,28 @@
-# Usulan pengganti ConfigMap bindplane-logging/log-forwarder-agent khusus
-# ticketing-app (lihat docs/LOGGING-STANDARD.md §5).
+# Pengganti ConfigMap bindplane-logging/log-forwarder-agent dengan DUA jalur
+# terpisah (lihat docs/LOGGING-STANDARD.md §5):
 #
-# Beda dengan config yang berjalan sekarang:
-#  1. Hanya membaca container ticketing-app (sebelumnya: SEMUA namespace + log OS
-#     + audit kube-apiserver), dan mengabaikan job trendmicro-scan-job-*.
-#  2. Baris JSON aplikasi TIDAK lagi dibungkus jadi string di dalam field "log"
-#     (JSON di dalam JSON). Field k8s.* digabung ke objek JSON aslinya, jadi
-#     di BindPlane cukup satu kali "Parse JSON" untuk mendapat booking.id,
-#     event.name, trace_id, dll.
-#  3. Prioritas syslog mengikuti field level (ERROR/WARN/INFO).
+#   app          container ticketing-app (kecuali job trendmicro-scan-job-*)
+#                -> JSON datar sesuai standar logging + field k8s.*
+#                -> exporter syslog/app, penanda "log.pipeline":"app"
+#   surrounding  container namespace lain + job trendmicro di ticketing-app,
+#                log OS node (/var/log/messages, secure, audit) dan audit
+#                kube-apiserver -> exporter syslog/surrounding,
+#                penanda "log.pipeline":"surrounding"
 #
-# Pipeline log OS / audit / k8s events sengaja dilepas. Bila tetap dibutuhkan,
-# pindahkan ke pipeline terpisah agar tidak tercampur dengan log aplikasi.
+# Catatan: container parser menaruh k8s.namespace/pod/container.name di RESOURCE
+# attributes. Config lama membacanya dari log attributes sehingga appname dan
+# field k8s.* di setiap pesan container selalu kosong — diperbaiki di sini.
 #
-# Apply:  kubectl apply -f deployments/bindplane/log-forwarder-agent-ticketing.yaml
-#         kubectl rollout restart ds/log-forwarder-agent -n bindplane-logging
-# Rollback: simpan config lama dulu ->
-#         kubectl get cm log-forwarder-agent -n bindplane-logging -o yaml > cm-backup.yaml
+# Kedua exporter saat ini menuju endpoint yang sama (UDP 10.100.33.105:5140);
+# bedakan di BindPlane dengan field log.pipeline, atau ganti port salah satunya
+# bila receiver BindPlane dibuat terpisah per jalur.
+# Kubernetes events dikirim oleh Deployment log-forwarder-events (tidak diubah)
+# dan termasuk kategori surrounding.
+#
+# Apply:    kubectl get cm log-forwarder-agent -n bindplane-logging -o yaml > cm-backup.yaml
+#           kubectl apply -f deployments/bindplane/log-forwarder-agent-ticketing.yaml
+#           kubectl rollout restart ds/log-forwarder-agent -n bindplane-logging
+# Rollback: kubectl apply -f cm-backup.yaml && kubectl rollout restart ds/log-forwarder-agent -n bindplane-logging
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -30,9 +36,12 @@ data:
         create_directory: true
 
     receivers:
-      filelog/ticketing:
-        include: [ /var/log/pods/ticketing-app_*/*/*.log ]
-        exclude: [ /var/log/pods/ticketing-app_trendmicro-scan-job-*/*/*.log ]
+      # Semua container stdout/stderr (format CRI containerd). Satu receiver
+      # dipakai dua pipeline; pemisahan app/surrounding dilakukan filter/*.
+      filelog/containers:
+        include: [ /var/log/pods/*/*/*.log ]
+        # jangan kirim balik log forwarder sendiri
+        exclude: [ /var/log/pods/bindplane-logging_*/*/*.log ]
         include_file_path: true
         start_at: end
         storage: file_storage
@@ -40,6 +49,28 @@ data:
           - type: container
             id: container-parser
             add_metadata_from_filepath: true
+      # Log OS node. kubelet/containerd masuk /var/log/messages lewat rsyslog.
+      filelog/os-messages:
+        include: [ /var/log/messages ]
+        start_at: end
+        storage: file_storage
+        attributes: { appname: os-messages }
+      filelog/os-secure:
+        include: [ /var/log/secure ]
+        start_at: end
+        storage: file_storage
+        attributes: { appname: os-secure }
+      filelog/os-auditd:
+        include: [ /var/log/audit/audit.log ]
+        start_at: end
+        storage: file_storage
+        attributes: { appname: os-auditd }
+      # Audit kube-apiserver (hanya ada di node control-plane).
+      filelog/kube-audit:
+        include: [ /var/log/kubernetes/kube-apiserver-audit.log ]
+        start_at: end
+        storage: file_storage
+        attributes: { appname: kube-apiserver-audit }
 
     processors:
       memory_limiter:
@@ -49,39 +80,93 @@ data:
       resource/node:
         attributes:
           - { key: k8s.node.name, value: "${env:K8S_NODE_NAME}", action: upsert }
-      transform/ticketing:
+
+      # --- pemisah jalur (kondisi = record yang DIBUANG dari pipeline) ---------
+      filter/app-only:
+        error_mode: ignore
+        logs:
+          log_record:
+            - 'resource.attributes["k8s.namespace.name"] != "ticketing-app"'
+            - 'IsMatch(resource.attributes["k8s.pod.name"], "^trendmicro-scan-job-")'
+            # init container injeksi OneAgent di pod aplikasi
+            - 'resource.attributes["k8s.container.name"] == "dynatrace-operator"'
+            # baris kosong (mis. output wrapper `npm start`)
+            - 'body == ""'
+      filter/exclude-app:
+        error_mode: ignore
+        logs:
+          log_record:
+            - 'resource.attributes["k8s.namespace.name"] == "ticketing-app" and not IsMatch(resource.attributes["k8s.pod.name"], "^trendmicro-scan-job-") and resource.attributes["k8s.container.name"] != "dynatrace-operator"'
+
+      # --- jalur app: JSON aplikasi dikirim datar (bukan JSON di dalam JSON) ---
+      transform/app:
+        error_mode: ignore
         log_statements:
           - context: log
             statements:
               - set(attributes["hostname"], resource.attributes["k8s.node.name"])
-              - set(attributes["appname"], attributes["k8s.container.name"])
-              # Baris JSON (semua komponen setelah docs/LOGGING-STANDARD.md):
-              # gabungkan field k8s.* ke objek aslinya, kirim sebagai satu JSON datar.
+              - set(attributes["appname"], resource.attributes["k8s.container.name"])
               - merge_maps(cache, ParseJSON(body), "upsert") where IsMatch(body, "^\\s*\\{")
-              - set(cache["k8s.namespace.name"], attributes["k8s.namespace.name"]) where IsMatch(body, "^\\s*\\{")
-              - set(cache["k8s.pod.name"], attributes["k8s.pod.name"]) where IsMatch(body, "^\\s*\\{")
-              - set(cache["k8s.container.name"], attributes["k8s.container.name"]) where IsMatch(body, "^\\s*\\{")
-              - set(cache["k8s.node.name"], resource.attributes["k8s.node.name"]) where IsMatch(body, "^\\s*\\{")
-              - set(attributes["message"], String(cache)) where IsMatch(body, "^\\s*\\{")
-              # Baris non-JSON (mis. error_log nginx, panic): kirim apa adanya.
-              - set(attributes["message"], body) where not IsMatch(body, "^\\s*\\{")
+              # baris non-JSON (mis. error_log nginx, panic) dibungkus agar tetap JSON
+              - set(cache["message"], body) where not IsMatch(body, "^\\s*\\{")
+              - set(cache["log.iostream"], attributes["log.iostream"]) where not IsMatch(body, "^\\s*\\{")
+              - set(cache["log.pipeline"], "app")
+              - set(cache["k8s.namespace.name"], resource.attributes["k8s.namespace.name"])
+              - set(cache["k8s.pod.name"], resource.attributes["k8s.pod.name"])
+              - set(cache["k8s.container.name"], resource.attributes["k8s.container.name"])
+              - set(cache["k8s.node.name"], resource.attributes["k8s.node.name"])
               # local0 + severity: 131=err, 132=warning, 134=info, 135=debug
               - set(attributes["priority"], 134)
               - set(attributes["priority"], 132) where cache["level"] == "WARN"
               - set(attributes["priority"], 131) where cache["level"] == "ERROR"
               - set(attributes["priority"], 131) where attributes["log.iostream"] == "stderr" and not IsMatch(body, "^\\s*\\{")
               - set(attributes["priority"], 135) where cache["level"] == "DEBUG"
+              - set(attributes["message"], String(cache))
+              - set(body, attributes["message"])
+
+      # --- jalur surrounding: container lain (format sama seperti sebelumnya) --
+      transform/surrounding-containers:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["hostname"], resource.attributes["k8s.node.name"])
+              - set(attributes["appname"], resource.attributes["k8s.container.name"])
+              - set(attributes["priority"], 134)
+              - set(attributes["priority"], 131) where attributes["log.iostream"] == "stderr"
+              - set(body, Substring(body, 0, 32000)) where Len(body) > 32000
+              - 'set(body, {"log.pipeline": "surrounding", "log.source": "container", "k8s.namespace.name": resource.attributes["k8s.namespace.name"], "k8s.pod.name": resource.attributes["k8s.pod.name"], "k8s.container.name": resource.attributes["k8s.container.name"], "k8s.node.name": resource.attributes["k8s.node.name"], "log.iostream": attributes["log.iostream"], "log": body})'
+              - set(attributes["message"], String(body))
+              - set(body, attributes["message"])
+      # --- jalur surrounding: log OS node & audit kube-apiserver --------------
+      transform/surrounding-node:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["hostname"], resource.attributes["k8s.node.name"])
+              - set(attributes["priority"], 134)
+              - set(body, Substring(body, 0, 32000)) where Len(body) > 32000
+              - 'set(body, {"log.pipeline": "surrounding", "log.source": attributes["appname"], "k8s.node.name": resource.attributes["k8s.node.name"], "log": body})'
+              - set(attributes["message"], String(body))
               - set(body, attributes["message"])
       batch:
         timeout: 1s
         send_batch_size: 512
 
     exporters:
-      syslog:
+      # UDP dipertahankan karena hanya itu yang didengar receiver saat ini.
+      # Pindah ke network: tcp (+ protocol rfc5424) begitu receiver membuka TCP,
+      # agar pesan >1 KB tidak berisiko terpotong/hilang.
+      syslog/app:
         endpoint: 10.100.33.105
-        # UDP tetap dipakai karena hanya itu yang didengar receiver saat ini.
-        # Pindah ke "tcp" (dan rfc5424) begitu receiver BindPlane membuka TCP 5140,
-        # agar pesan >1 KB tidak berisiko terpotong/hilang.
+        network: udp
+        port: 5140
+        protocol: rfc3164
+        tls:
+          insecure: true
+      syslog/surrounding:
+        endpoint: 10.100.33.105
         network: udp
         port: 5140
         protocol: rfc3164
@@ -96,7 +181,15 @@ data:
         logs:
           level: info
       pipelines:
-        logs/ticketing:
-          receivers: [ filelog/ticketing ]
-          processors: [ memory_limiter, resource/node, transform/ticketing, batch ]
-          exporters: [ syslog ]
+        logs/app:
+          receivers: [ filelog/containers ]
+          processors: [ memory_limiter, resource/node, filter/app-only, transform/app, batch ]
+          exporters: [ syslog/app ]
+        logs/surrounding-containers:
+          receivers: [ filelog/containers ]
+          processors: [ memory_limiter, resource/node, filter/exclude-app, transform/surrounding-containers, batch ]
+          exporters: [ syslog/surrounding ]
+        logs/surrounding-node:
+          receivers: [ filelog/os-messages, filelog/os-secure, filelog/os-auditd, filelog/kube-audit ]
+          processors: [ memory_limiter, resource/node, transform/surrounding-node, batch ]
+          exporters: [ syslog/surrounding ]
